@@ -117,7 +117,9 @@ for _form in "اسبوعين ساعتين دقيقتين ليلتين".split():
 # Any other word built on these is a number the table does not know, such as
 # "آلاف" (thousands) after a count. It is kept as itself, so the check fails
 # closed: the claim is cut unless its source uses the same word.
-_AR_LARGE = re.compile("مائه|مئه|الاف|الف|مليون|ملايين|مليار")
+# Whole words only, after a prefix and the article are taken off: "مخالفه"
+# and "فتره" contain "الف" and are not numbers.
+_AR_LARGE = re.compile(r"^(?:\S*مائه|\S*مئه|الاف|الوف|مليون|ملايين|مليار|مليارات)$")
 
 
 def _arabic_number_words(text: str) -> set[str]:
@@ -126,10 +128,12 @@ def _arabic_number_words(text: str) -> set[str]:
     for token in tokenize(text, stem=False):  # whole words: the stemmer would cut "آلاف" to "اف"
         bare = token[1:] if len(token) > 3 and token[0] in "وبلف" else token
         forms = [token, bare, *(w[2:] for w in (token, bare) if w.startswith("ال") and len(w) > 4)]
+        if token.startswith("لل") and len(token) > 4:  # "للثلاثين": لِ + ال
+            forms.append(token[2:])
         known = next((w for w in forms if w in _AR_NUMBER_WORDS), None)
         if known:
             out.add(str(_AR_NUMBER_WORDS[known]))
-        elif _AR_LARGE.search(token):
+        elif any(_AR_LARGE.match(w) for w in forms):
             out.add(token)
     return out
 
@@ -177,6 +181,11 @@ SUPPORT_MIN = 0.6
 # the multilingual embedding model. Set on translated and mismatched pairs;
 # see docs/evaluation.md.
 CROSS_LANGUAGE_MIN = 0.55
+# For a claim with the writer's English version of it: the least similarity
+# between the two sentences. On the 25 labelled pairs in
+# eval/cross-language-pairs.jsonl, faithful renderings scored 0.67 to 0.83
+# (one three-word fragment 0.47) and wrong ones at most 0.54.
+RENDERING_MIN = 0.60
 # How much of the passage before a quote counts as its context, so a list item
 # such as "b. Governmental entities" keeps the lead-in that gives it meaning.
 CONTEXT_CHARS = 200
@@ -207,7 +216,19 @@ def clauses(text: str, size: int = 30) -> list[str]:
 # Arabic words that negate only sometimes: "غير الحكومية" is "non-governmental"
 # and "دون سن" is "under the age of".
 _AR_SOFT_NEGATIONS = frozenset({"غير", "دون"})
-_SOFT_BACKING = frozenset({"non", "under", "below", "except", "less", "without", "other"})
+# "غير" backed by English "non"; "دون" before an age or a number ("دون سن
+# 18") backed by "under", "below" or "less". Nothing else backs them.
+_SOFT_BACKING = {"غير": frozenset({"non"}), "دون": frozenset({"under", "below", "less"})}
+_DUN_AMOUNT = re.compile(r"دون\s+(?:سن|عمر|[\d\u0660-\u0669])")
+
+
+# Arabic phrases built on a negation word that do not negate: "ما لم"
+# (unless), "لا سيما" (especially), "لا بد" (must).
+_AR_IDIOMS = re.compile(r"ما\s+لم|لا\s*سي[ّ]?ما|لا\s+بد|لابد")
+
+
+def _without_idioms(text: str) -> str:
+    return _AR_IDIOMS.sub(" ", text)
 
 
 def _negations(words: set[str]) -> set[str]:
@@ -263,6 +284,9 @@ class SentenceCheck:
     kept: bool
     reasons: list[str] = field(default_factory=list)
     citations: list[CitationCheck] = field(default_factory=list)
+    # For a claim in another language than its sources: the writer's English
+    # version of it, checked against the sources like an English claim.
+    text_en: str = ""
 
 
 @dataclass
@@ -288,6 +312,7 @@ class AnswerCheck:
             "sentences": [
                 {
                     "text": s.text, "kind": s.kind, "kept": s.kept, "reasons": s.reasons,
+                    **({"text_en": s.text_en} if s.text_en else {}),
                     "citations": [
                         {"ok": c.ok, "reason": c.reason, "doc_id": c.doc_id, "page": c.page,
                          "page_start": c.page_start, "page_end": c.page_end, **c.citation}
@@ -429,7 +454,7 @@ class Verifier:
     def check_sentence(self, sentence: Mapping[str, Any]) -> SentenceCheck:
         text = (sentence.get("text") or "").strip()
         kind = sentence.get("kind") or "claim"
-        result = SentenceCheck(text, kind, kept=True)
+        result = SentenceCheck(text, kind, kept=True, text_en=(sentence.get("text_en") or "").strip())
         citations = sentence.get("citations") or []
         if kind in UNCITED_KINDS:
             if self.allowed_uncited is not None and fold(text)[0] not in self.allowed_uncited:
@@ -471,7 +496,10 @@ class Verifier:
             # A drafter may reword its sources. The claim's key words must mostly
             # be in them, and it may not add a negation they lack.
             evidence = " ".join(f"{c.context} {c.evidence}" for c in result.citations)
-            if _script(text) != _script(" ".join(quotes)):
+            if _script(text) != _script(" ".join(quotes)) and result.text_en \
+                    and _script(result.text_en) == _script(" ".join(quotes)):
+                self.check_rendering(result, evidence, quotes)
+            elif _script(text) != _script(" ".join(quotes)):
                 # Words cannot be matched across languages; compare meaning,
                 # against each clause of the quotes, since a claim usually
                 # renders one clause of a long legal sentence.
@@ -498,15 +526,66 @@ class Verifier:
                                               "single document: " + ", ".join(missing))
             # Negations count as one class: "cannot" is backed by a source's "will not".
             # "No." in "Law No. 45" is a law reference, not a negation.
-            added = sorted(_negations(_words(_LAW_NUMBER.sub(" ", text))))
+            added = sorted(_negations(_words(_without_idioms(_LAW_NUMBER.sub(" ", text)))))
             backing = _negations(_words(evidence))
-            if set(added) <= _AR_SOFT_NEGATIONS:
-                # "غير" is often "non-" and "دون" "under"; English that says so backs them.
-                backing |= _words(evidence) & _SOFT_BACKING
+            if not backing and added and set(added) <= _AR_SOFT_NEGATIONS:
+                # "غير" can be "non-" and "دون" "under"; English that says so backs them.
+                words = _words(evidence)
+                if all(words & _SOFT_BACKING[w] and (w != "دون" or _DUN_AMOUNT.search(text)) for w in added):
+                    backing = set(added)
             if result.kept and added and not backing:
                 result.kept = False
                 result.reasons.append("claim adds a negation its sources do not have: " + ", ".join(added))
         return result
+
+    def check_rendering(self, result: SentenceCheck, evidence: str, quotes: list[str]) -> None:
+        """A claim in another language than its sources, with the writer's
+        English version of it. The English version is checked against the
+        sources as an English claim is: key words, numbers, negations, and
+        not stitched from two documents. Then the claim must say what its
+        English version says: the same numbers, a negation in one only if in
+        the other, and a meaning similarity of at least RENDERING_MIN between
+        the two sentences, which is a much closer test than a sentence
+        against a whole legal paragraph."""
+        text, en = result.text, result.text_en
+        backed = set().union(*(numbers(c.evidence) for c in result.citations))
+        titled = set().union(*(numbers(c.title) for c in result.citations)) & law_numbers(en)
+        missing = sorted(numbers(en) - backed - titled, key=lambda n: (len(n), n))
+        problems = []
+        if missing:
+            problems.append("its English version has numbers not in any cited source: " + ", ".join(missing))
+        share = support(en, evidence)
+        if share < SUPPORT_MIN:
+            problems.append(f"its English version is not supported by its sources (key words found: {share:.0%})")
+        en_neg = _negations(_words(_LAW_NUMBER.sub(" ", en)))
+        if en_neg and not _negations(_words(evidence)):
+            problems.append("its English version adds a negation its sources do not have: " + ", ".join(sorted(en_neg)))
+        # Every number of the English version must be in the claim too. One and
+        # two are left out: Arabic often says them in the noun itself, "سنة"
+        # (a year), "الطرفين" (both parties). The claim's own numbers were
+        # checked against the sources above.
+        dropped = sorted(numbers(en) - numbers(text) - {"1", "2"}, key=lambda n: (len(n), n))
+        if dropped:
+            problems.append("it leaves out numbers its English version has: " + ", ".join(dropped))
+        ar_neg = {w for w in _negations(_words(_without_idioms(text)))
+                  if not (w in _AR_SOFT_NEGATIONS and _words(en) & _SOFT_BACKING[w])}
+        if bool(ar_neg) != bool(en_neg):
+            problems.append("it negates where its English version does not, or the other way round")
+        if not problems:
+            sims = (self.similarity(text, [en]) or []) if self.similarity else []
+            if not sims:
+                problems.append("no model is available to compare it with its English version")
+            elif sims[0] < RENDERING_MIN:
+                problems.append(f"it does not say what its English version says (similarity {sims[0]:.2f}, "
+                                f"needs {RENDERING_MIN:.2f})")
+        if not problems and self.question:
+            gaps = self.stitched(en, result.citations)
+            if gaps:
+                problems.append("no one source says what the claim answers; missing from every single document: "
+                                + ", ".join(gaps))
+        if problems:
+            result.kept = False
+            result.reasons.extend(problems)
 
     def stitched(self, claim: str, citations: list[CitationCheck]) -> list[str]:
         """The claim's words that repeat the question and that no single cited

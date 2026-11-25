@@ -21,11 +21,14 @@ from dalil import lang, safety
 from dalil.draft import (FEE_CAVEAT, LAW_CAVEAT, WEAK_REFUSAL, Drafter, ExtractiveDrafter, caveat, data_claims,
                          refusal)
 from dalil.opendata import DataResult, match_rules, run_rules
-from dalil.retrieve import Hit, Searcher, make_retriever
+from dalil.retrieve import Hit, Searcher, make_retriever, tokenize
 from dalil.store import Store
 from dalil.hmem import Guidance, guidance
 from dalil.laws import is_scope_question, law_refs, scope_passages
-from dalil.subjects import names_subject, subject_docs
+from dalil.subjects import names_subject, subject_docs, title_terms
+
+# Words for the person who holds a service, not for what is asked about it.
+_ROLE_WORDS = frozenset(tokenize("holder holders owner owners applicant applicants resident residents person people"))
 from dalil.verify import Verifier, data_lookup, load_passages
 
 def cited_passages(check: dict[str, Any] | None) -> list[str]:
@@ -290,8 +293,13 @@ class Pipeline:
         if not subjects or not any(h.doc_id in subjects for h in hits):
             return hits
         names = [titles[d].split("|")[0] for d in subjects]
+        # What the question asks about the subject: its words, less the
+        # subject's own name and words for the person holding it.
+        asked = set(tokenize(question)) - set().union(*(title_terms(n) for n in names)) - _ROLE_WORDS \
+            - safety.subject_generic()
         return [h for h in hits if h.doc_id in subjects or h.doc_id in laws
-                or names_subject(f"{titles.get(h.doc_id, '')} {h.heading or ''} {h.text}", names)]
+                or (names_subject(f"{titles.get(h.doc_id, '')} {h.heading or ''} {h.text}", names)
+                    and set(tokenize(h.text)) & asked)]
 
     def _language(self, doc_id: str) -> str:
         for p in self.passages.values():
@@ -384,7 +392,7 @@ class Pipeline:
         verifier = Verifier(self.passages, data_lookup(client) if client else None,
                             allowed_sql=[d.sql for d in data], allowed_uncited=FIXED_UNCITED,
                             allowed_passages=[h.passage_id for h in hits], titles=self.titles, laws=self.laws,
-                            similarity=getattr(self.retriever, "similarities", None), question=q,
+                            similarity=getattr(self.retriever, "similarities", None), question=english or q,
                             subjects=subjects,
                             data_facts={d.sql: " ".join(f for f in (d.fact, d.fact_ar, d.meaning) if f)
                                         for d in data if d.fact})
