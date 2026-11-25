@@ -183,7 +183,31 @@ class Pipeline:
         })
         return g
 
-    def search(self, question: str, avoid: set[str]) -> list[Hit]:
+    def translator(self) -> Callable[[str], str] | None:
+        """The model's translate(), when the drafter has a model."""
+        d = self.drafter
+        for candidate in (d, getattr(d, "primary", None), getattr(getattr(d, "inner", None), "primary", None)):
+            if candidate is not None and callable(getattr(candidate, "translate", None)):
+                return candidate.translate
+        return None
+
+    def english_query(self, qid: str, question: str) -> str:
+        """For a question that is not in English, its English translation, or ""."""
+        if lang.language(question) == lang.ENGLISH:
+            return ""
+        translate = self.translator()
+        if translate is None:
+            return ""
+        try:
+            english = translate(question)
+        except Exception as e:  # the model is down: search with the question alone
+            self.store.event(qid, "translated", {"ok": False, "error": type(e).__name__})
+            return ""
+        english = english if lang.language(english) == lang.ENGLISH else ""
+        self.store.event(qid, "translated", {"ok": bool(english), "english": english})
+        return english
+
+    def search(self, question: str, avoid: set[str], english: str = "") -> list[Hit]:
         """Top k hits, leaving out `avoid` and filling up from further down the ranking.
 
         For a question about what a law covers, the scope article of each law
@@ -192,8 +216,10 @@ class Pipeline:
         question's to rank high.
         """
         hits = self.retriever.search(question, self.k + len(avoid))
+        if english:
+            hits = fuse(self.retriever.search(english, self.k + len(avoid)), hits)
         hits = [h for h in hits if h.passage_id not in avoid][: self.k]
-        hits = self.on_subject(question, hits)
+        hits = self.on_subject(english or question, hits)
         if not is_scope_question(question) or not self.laws:
             return hits
         law_docs = list(dict.fromkeys(h.doc_id for h in hits[:SCOPE_FROM] if h.doc_id in self.laws))
@@ -255,6 +281,7 @@ class Pipeline:
     def _answer(self, qid: str, screened: safety.ScreenResult) -> Record:
         q = screened.redacted_question
         hits: list[Hit] = []
+        english = ""  # the question in English, when it was asked in another language
         data: list[DataResult] = []
         client = None
         if screened.is_rule_evasion:
@@ -268,7 +295,8 @@ class Pipeline:
                 draft.append(caveat(safety.PERSONAL_DATA_CAVEAT))
         else:
             past = self.recall(qid, q)
-            hits = self.search(q, past.avoid)
+            english = self.english_query(qid, q)
+            hits = self.search(q, past.avoid, english)
             self.store.event(qid, "retrieved", {
                 "k": self.k, "hits": len(hits),
                 "top": [{"passage_id": h.passage_id, "score": round(h.score, 3)} for h in hits[:3]],
@@ -312,7 +340,8 @@ class Pipeline:
         draft, attached = attach_data(draft, data)
         if client is None and any("sql" in c for s in draft for c in s.get("citations") or []):
             client, _ = self.data_source()
-        subjects = {d: self.titles[d] for d in subject_docs(q, self.titles) if any(h.doc_id == d for h in hits)}
+        subjects = {d: self.titles[d] for d in subject_docs(english or q, self.titles)
+                    if any(h.doc_id == d for h in hits)}
         verifier = Verifier(self.passages, data_lookup(client) if client else None,
                             allowed_sql=[d.sql for d in data], allowed_uncited=FIXED_UNCITED,
                             allowed_passages=[h.passage_id for h in hits], titles=self.titles, laws=self.laws,
@@ -324,7 +353,11 @@ class Pipeline:
         if added:
             draft = added
             check = verifier.check_answer(draft).to_dict()
-        if self.redraft and self._all_claims_cut(check) and not isinstance(self.drafter, ExtractiveDrafter):
+        # Only for English questions: the extractive drafter matches words, and
+        # most sources are English, so for another language it finds the few
+        # documents in that language whether or not they answer.
+        if self.redraft and question_lang == lang.ENGLISH and self._all_claims_cut(check) \
+                and not isinstance(self.drafter, ExtractiveDrafter):
             # The model's every claim failed the checker. Quote the sources
             # instead: the extractive drafter copies whole source sentences,
             # so whatever it keeps is the documents' own words.
@@ -521,6 +554,20 @@ def restate_data(draft: list[dict[str, Any]], check: dict[str, Any], data: list[
     # After the model's claims, before the fixed caveats and refusals.
     at = max((i + 1 for i, s in enumerate(out) if s.get("kind", "claim") == "claim"), default=0)
     return out[:at] + extra + out[at:]
+
+
+def fuse(first: list[Hit], second: list[Hit], rrf_k: int = 60) -> list[Hit]:
+    """Two rankings in one by reciprocal rank, each passage keeping its best
+    BM25 score, so the weak-retrieval gate sees the English query's matches."""
+    score: dict[str, float] = {}
+    best: dict[str, Hit] = {}
+    for ranking in (first, second):
+        for rank, h in enumerate(ranking, start=1):
+            score[h.passage_id] = score.get(h.passage_id, 0.0) + 1.0 / (rrf_k + rank)
+            old = best.get(h.passage_id)
+            best[h.passage_id] = h if old is None else Hit(**{**asdict(h), "score": max(h.score, old.score),
+                                                              "dense": max(h.dense, old.dense)})
+    return [best[p] for p in sorted(score, key=lambda p: -score[p])]
 
 
 _default: Pipeline | None = None

@@ -205,8 +205,9 @@ def main() -> int:
     ap.add_argument("--extractive", action="store_true", help="draft without the model")
     ap.add_argument("--language", choices=sorted(QUESTIONS), default="en",
                     help="ask the scenarios in English (default) or Arabic")
+    ap.add_argument("--out", type=Path, help="folder for the store and report.json (default build/itu-scenarios[-ar])")
     args = ap.parse_args()
-    out = OUT if args.language == "en" else OUT.with_name(f"{OUT.name}-{args.language}")
+    out = args.out or (OUT if args.language == "en" else OUT.with_name(f"{OUT.name}-{args.language}"))
     if out.exists():
         shutil.rmtree(out)
     out.mkdir(parents=True)
