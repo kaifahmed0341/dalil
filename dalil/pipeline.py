@@ -583,8 +583,9 @@ def attach_data(draft: list[dict[str, Any]], data: list[DataResult]) -> tuple[li
 
 def drop_unrelated_passages(draft: list[dict[str, Any]], data: list[DataResult]
                             ) -> tuple[list[dict[str, Any]], int]:
-    """On a claim that states a lookup's value and cites that lookup, keep a
-    passage citation only if its quote shares a subject word with the claim.
+    """On a claim that states a lookup's value and cites that lookup, put the
+    data citations first, and keep a passage citation only if its quote shares
+    a subject word with the claim.
 
     The model tends to add a passage to every data sentence, such as a page on
     cancelling a visa next to "ICP handles 3763072 residence permit renewals".
@@ -601,10 +602,13 @@ def drop_unrelated_passages(draft: list[dict[str, Any]], data: list[DataResult]
             out.append(s)
             continue
         words = {t for t in tokenize(str(s.get("text", ""))) if not t.isdigit()}
-        keep = [c for c in cits if "sql" in c
-                or words & {t for t in tokenize(str(c.get("quote") or "")) if not t.isdigit()}]
+        # The data citations come first: they carry the claim, so the screen
+        # numbers them 1, 2, and a reviewer opens the lookup before any page.
+        keep = [c for c in cits if "sql" in c] + [
+            c for c in cits if "sql" not in c
+            and words & {t for t in tokenize(str(c.get("quote") or "")) if not t.isdigit()}]
         dropped += len(cits) - len(keep)
-        out.append({**s, "citations": keep} if len(keep) != len(cits) else s)
+        out.append({**s, "citations": keep} if keep != cits else s)
     return out, dropped
 
 
