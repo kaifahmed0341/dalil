@@ -271,7 +271,7 @@ class Pipeline:
                     "rows": [len(d.rows) for d in data],
                     "notes": [d.note for d in data if d.note],
                 })
-            draft = self.drafter.draft(q, hits, data, notes=past.notes)
+            draft = self.drafter.draft(q, hits, data, notes=past.notes, **({"english": english} if english else {}))
             if screened.has_personal_data:
                 draft = [*draft, caveat(safety.PERSONAL_DATA_CAVEAT)]
         # Fixed refusals and caveats go out in the question's language.

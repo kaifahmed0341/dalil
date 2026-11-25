@@ -358,7 +358,8 @@ def test_arabic_questions_also_search_with_their_english_translation(tmp_path):
         def translate(self, q):
             return "Does the records law cover public bodies?"
 
-        def draft(self, question, hits, data, notes=()):
+        def draft(self, question, hits, data, notes=(), english=""):
+            self.english = english
             return []
 
     class ByLanguage(FakeRetriever):
@@ -373,6 +374,7 @@ def test_arabic_questions_also_search_with_their_english_translation(tmp_path):
                                                     "هل يطبق قانون السجلات على الجهات العامة؟"])
     events = {e["kind"]: e["detail"] for e in p.store.get(rec.id)["audit"]}
     assert events["translated"]["english"].startswith("Does the records law")
+    assert p.drafter.english == "Does the records law cover public bodies?"  # the writer gets it too
     assert {h["passage_id"] for h in rec.retrieval} >= {PORTAL["passage_id"], FED_OTHER["passage_id"]}
     # Fusing keeps each passage's best keyword score, so the weak-retrieval gate sees the English match.
     fused = fuse([as_hit(PORTAL, 20.0)], [as_hit(PORTAL, 1.0, 0.7), as_hit(FED_OTHER, 3.0)])
@@ -394,3 +396,12 @@ def test_english_questions_are_not_translated(tmp_path):
                  zetaris_factory=None)
     p.answer("How do I see my records?")
     assert Counting.calls == 0
+
+
+def test_writer_gets_the_english_question_and_the_arabic_original():
+    d = LLMDrafter()
+    q = "هل يطبق قانون السجلات على الجهات العامة؟"
+    m = d.messages(q, [as_hit(FED_SCOPE)], [], english="Does the records law cover public bodies?")
+    assert "<question>Does the records law cover public bodies?</question>" in m[1]["content"]
+    assert f"<asked_in_arabic>{q}</asked_in_arabic>" in m[1]["content"]
+    assert d.LANGUAGE_RULES["ar"] in m[0]["content"]
