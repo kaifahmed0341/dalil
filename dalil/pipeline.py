@@ -339,9 +339,8 @@ def fuse(first: list[Hit], second: list[Hit], rrf_k: int = 60) -> list[Hit]:
         for rank, h in enumerate(ranking, start=1):
             score[h.passage_id] = score.get(h.passage_id, 0.0) + 1.0 / (rrf_k + rank)
             old = best.get(h.passage_id)
-            if old is None or (h.score, h.dense) > (old.score, old.dense):
-                best[h.passage_id] = Hit(**{**asdict(h), "score": max(h.score, old.score if old else 0.0),
-                                            "dense": max(h.dense, old.dense if old else 0.0)})
+            best[h.passage_id] = h if old is None else Hit(**{**asdict(h), "score": max(h.score, old.score),
+                                                              "dense": max(h.dense, old.dense)})
     return [best[p] for p in sorted(score, key=lambda p: -score[p])]
 
 
