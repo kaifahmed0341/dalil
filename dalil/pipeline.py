@@ -396,6 +396,7 @@ class Pipeline:
                             allowed_sql=[d.sql for d in data], allowed_uncited=FIXED_UNCITED,
                             allowed_passages=[h.passage_id for h in hits], titles=self.titles, laws=self.laws,
                             similarity=getattr(self.retriever, "similarities", None), question=english or q,
+                            language=question_lang,
                             subjects=subjects,
                             data_facts={d.sql: " ".join(f for f in (d.fact, d.fact_ar, d.meaning) if f)
                                         for d in data if d.fact})

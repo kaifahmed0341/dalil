@@ -374,7 +374,7 @@ class Verifier:
                  allowed_passages: Iterable[str] | None = None, titles: Mapping[str, str] | None = None,
                  laws: Mapping[str, Any] | None = None,
                  similarity: Callable[[str, list[str]], list[float] | None] | None = None,
-                 question: str = "", subjects: Mapping[str, str] | None = None,
+                 question: str = "", subjects: Mapping[str, str] | None = None, language: str = "",
                  data_facts: Mapping[str, str] | None = None):
         """`allowed_sql`: the queries the pipeline itself ran. A data citation must
         name one of them exactly, so a drafter cannot write its own SQL, such as
@@ -405,6 +405,8 @@ class Verifier:
         # about (dalil.subjects). Empty leaves those rules off.
         self.question = question
         self.subjects = dict(subjects or {})
+        # The language the answer goes out in, "en" or "ar"; "" leaves it unchecked.
+        self.language = language
 
     def check_quote(self, citation: Mapping[str, Any]) -> CitationCheck:
         cit = dict(citation)
@@ -478,6 +480,10 @@ class Verifier:
         if not citations:
             result.kept = False
             result.reasons.append("no citation")
+            return result
+        if self.language and text and _script(text) != self.language:
+            result.kept = False
+            result.reasons.append("not written in the language of the question")
             return result
         for cit in citations:
             check = self.check_data(cit) if "sql" in cit or "table" in cit else self.check_quote(cit)
