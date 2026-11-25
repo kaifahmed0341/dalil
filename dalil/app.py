@@ -25,6 +25,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
+from dalil import datasource
 from dalil.corpus import doc_id as manifest_doc_id
 from dalil.corpus import load_manifest, resolve_corpus_dir
 from dalil.draft import ExtractiveDrafter, FallbackDrafter, LLMDrafter
@@ -80,6 +81,8 @@ def load_documents(path: Path | str = DEFAULT_DOCUMENTS) -> dict[str, dict[str, 
 
 
 def default_zetaris_probe() -> bool:
+    """True when Zetaris itself answers. The health endpoint no longer uses it by
+    default: it reports the source the pipeline actually uses."""
     try:
         from dalil import zetaris as z
 
@@ -107,13 +110,21 @@ def open_table_meta(table: str) -> dict[str, str | None]:
     return {"title": src.get("title"), "source_url": url or None}
 
 
+def data_kind(result: Mapping[str, Any]) -> str:
+    """Which source ran a stored lookup. Records saved before the local
+    database existed carry no source; rows in them came from Zetaris."""
+    if "source" in result:
+        return result.get("source") or ""
+    return datasource.KIND_ZETARIS if result.get("rows") else ""
+
+
 def create_app(
     pipeline: Pipeline,
     documents: Mapping[str, Mapping[str, Any]],
     manifest: Mapping[str, str] | None = None,
     corpus_dir: Path | str | None = None,
     web_dir: Path | str | None = DEFAULT_WEB,
-    zetaris_probe: Callable[[], bool] = default_zetaris_probe,
+    zetaris_probe: Callable[[], bool] | None = None,
 ) -> FastAPI:
     """manifest maps doc_id -> file name inside corpus_dir; only those files are served."""
     store = pipeline.store
@@ -147,7 +158,9 @@ def create_app(
              "start": h["start"], "end": h["end"]}
             for h in rec["retrieval"]
         ]
-        data = [{"table": d["table"], "sql": d["sql"], "rows": d["rows"], "note": d["note"]} for d in rec["data"]]
+        data = [{"table": d["table"], "sql": d["sql"], "rows": d["rows"], "note": d["note"],
+                 "source": data_kind(d), "source_label": datasource.source_label(data_kind(d))}
+                for d in rec["data"]]
         check = rec["check"]
         if check:
             check = json.loads(json.dumps(check))
@@ -159,6 +172,9 @@ def create_app(
                     else:
                         meta = open_table_meta(c.get("table") or "")
                         c["title"], c["source_url"] = meta.get("title") or c.get("table"), meta.get("source_url")
+                        ran = next((d for d in data if d["table"] == c.get("table") and d["sql"] == c.get("sql")),
+                                   None) or next((d for d in data if d["table"] == c.get("table")), None)
+                        c["source_label"] = ran["source_label"] if ran else None
         return {
             "id": rec["id"], "question": rec["question"], "flags": rec["flags"], "status": rec["status"],
             "created_at": rec["created_at"], "retrieval": retrieval, "data": data, "check": check,
@@ -250,7 +266,11 @@ def create_app(
     @app.get("/api/health")
     def health() -> dict[str, Any]:
         memory = pipeline.memory.health() if pipeline.memory is not None else None
-        return {"ok": True, "zetaris": bool(zetaris_probe()), "passages": len(pipeline.passages),
+        source = pipeline.data_source_status()
+        # zetaris stays for older screens: true only when Zetaris itself serves the data.
+        zetaris = bool(zetaris_probe()) if zetaris_probe is not None else (
+            source["connected"] and source["kind"] == datasource.KIND_ZETARIS)
+        return {"ok": True, "zetaris": zetaris, "data_source": source, "passages": len(pipeline.passages),
                 "memory": bool(memory), "memories": (memory or {}).get("memories", 0)}
 
     if web_dir is not None and Path(web_dir).is_dir():

@@ -70,7 +70,7 @@
     screened: "Question screened",
     recalled: "Past reviews recalled from H-MEM",
     retrieved: "Sources searched",
-    data_looked_up: "Open data queried through Zetaris",
+    data_looked_up: "Open data queried",
     drafted: "Answer drafted",
     verified: "Quotes checked",
     queued: "Sent for review",
@@ -221,9 +221,11 @@
     if (MOCK) el.append(h("span", { class: "badge badge-mock" }, "Sample data (mock mode)"));
     try {
       const hl = await api.health();
-      const ok = hl.ok && hl.zetaris;
-      el.append(h("span", null, h("span", { class: "dot " + (ok ? "dot-ok" : "dot-bad"), "aria-hidden": "true" }),
-        (hl.zetaris ? "Zetaris connected" : "Zetaris not connected") +
+      // data_source names the open-data backend; older servers only send zetaris.
+      const src = hl.data_source || { connected: !!hl.zetaris, label: hl.zetaris ? "Open data: Zetaris" : "Open data: not configured" };
+      const ok = hl.ok && src.connected;
+      el.append(h("span", null, h("span", { class: "dot " + (ok ? "dot-ok" : "dot-off"), "aria-hidden": "true" }),
+        src.label +
           (typeof hl.passages === "number" ? ", " + hl.passages.toLocaleString("en-GB") + " passages" : "")));
     } catch (e) {
       el.append(h("span", null, h("span", { class: "dot dot-bad", "aria-hidden": "true" }), "Server not reachable"));
@@ -550,7 +552,7 @@
               (state.record.data || []).find((x) => x.table === c.table);
     v.append(heading,
       h("p", { class: "source-title" }, c.title || "Open-data table"),
-      h("p", { class: "source-meta" }, "Table ", h("code", null, c.table), ", queried through Zetaris"),
+      h("p", { class: "source-meta" }, "Table ", h("code", null, c.table), ", " + (c.source_label || (d && d.source_label) || "open-data lookup")),
       citeStatus(c),
       h("p", { class: "data-value" }, "Cited value: ", h("mark", { class: "quote-mark" }, String(c.value))),
       h("p", { class: "sub-title" }, "Query Dalil ran"),

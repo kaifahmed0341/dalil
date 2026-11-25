@@ -386,7 +386,7 @@ class Verifier:
         return AnswerCheck(status, checks)
 
 
-# --- rerunning data citations through Zetaris --------------------------------
+# --- rerunning data citations on the open-data source --------------------------
 
 _WRITE_WORDS = re.compile(
     r"\b(insert|update|delete|merge|drop|create|alter|truncate|grant|revoke|cache|uncache|"
@@ -399,7 +399,7 @@ def safe_select(sql: str, allowed_schema: str = "dalil") -> str:
     """Return `sql` if it is one read-only SELECT over `allowed_schema` tables.
 
     A drafted answer's data citation carries SQL the model wrote, so the
-    checker refuses anything else before it reaches Zetaris.
+    checker refuses anything else before it reaches the data source.
     """
     s = sql.strip().rstrip(";").strip()
     if any(ch in s for ch in "`\""):
@@ -422,8 +422,13 @@ def safe_select(sql: str, allowed_schema: str = "dalil") -> str:
     return s
 
 
-def zetaris_lookup(client: Any, allowed_schema: str = "dalil") -> DataLookup:
-    """A DataLookup that reruns a citation's SQL on Zetaris, read-only."""
+def data_lookup(source: Any, allowed_schema: str = "dalil") -> DataLookup:
+    """A DataLookup that reruns a citation's SQL on the open-data source,
+    Zetaris or the local database (dalil.datasource), read-only."""
     def lookup(sql: str) -> list[dict[str, Any]]:
-        return client.sql(safe_select(sql, allowed_schema), limit=200).dicts()
+        return source.sql(safe_select(sql, allowed_schema), limit=200).dicts()
     return lookup
+
+
+# The old name: the checker's rerun was Zetaris-only when it was written.
+zetaris_lookup = data_lookup

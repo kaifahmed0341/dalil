@@ -23,7 +23,7 @@ from dalil.opendata import DataResult, match_rules, run_rules
 from dalil.retrieve import Hit, Searcher, make_retriever
 from dalil.store import Store
 from dalil.hmem import Guidance, guidance
-from dalil.verify import Verifier, load_passages, zetaris_lookup
+from dalil.verify import Verifier, data_lookup, load_passages
 
 def cited_passages(check: dict[str, Any] | None) -> list[str]:
     """Passage ids the kept sentences of a checked answer cite."""
@@ -72,15 +72,35 @@ def default_zetaris() -> Any:
     return z.Client(timeout=ZETARIS_TIMEOUT)
 
 
+class NoSource(RuntimeError):
+    """Raised by default_data_source when no open-data source is available."""
+
+
+def default_data_source() -> Any:
+    """The open-data source DALIL_OPEN_DATA picks (dalil.datasource), or raise
+    NoSource with the reason. Zetaris when configured and answering, else the
+    local database, by default."""
+    from dalil import datasource
+
+    source, why = datasource.resolve(zetaris_timeout=ZETARIS_TIMEOUT)
+    if source is None:
+        raise NoSource(why)
+    if why:  # auto mode fell back to the local database
+        print(f"open data: {why}", file=sys.stderr)
+    return source
+
+
 class Pipeline:
     def __init__(self, store: Store, retriever: Searcher, passages: dict[str, dict[str, Any]],
                  drafter: Drafter | None = None,
-                 zetaris_factory: Callable[[], Any] | None = default_zetaris, k: int = K,
+                 zetaris_factory: Callable[[], Any] | None = default_data_source, k: int = K,
                  memory: Any = None):
         self.store = store
         self.retriever = retriever
         self.passages = passages
         self.drafter = drafter or ExtractiveDrafter()
+        # Builds the open-data source: anything with sql(statement, limit) whose
+        # result has dicts(). The name is kept from when only Zetaris existed.
         self.zetaris_factory = zetaris_factory
         self.k = k
         self._zetaris: Any = None
@@ -93,19 +113,38 @@ class Pipeline:
                    **kwargs: Any) -> "Pipeline":
         return cls(store or Store(), make_retriever(passages_path), load_passages(passages_path), **kwargs)
 
-    def zetaris(self) -> tuple[Any, str]:
-        """The Zetaris client and "", or None and why it is unavailable."""
+    def data_source(self) -> tuple[Any, str]:
+        """The open-data source and "", or None and why it is unavailable."""
         if self._zetaris is not None:
             return self._zetaris, ""
         if self.zetaris_factory is None:
-            return None, "Zetaris not configured; lookup skipped"
+            return None, "Open data not configured; lookup skipped"
         try:
-            client = self.zetaris_factory()
-            client.sql("SELECT 1")
-        except Exception as e:  # ZetarisError messages carry no credentials
-            return None, f"Zetaris unreachable; lookup skipped ({type(e).__name__}: {str(e)[:160]})"
-        self._zetaris = client
-        return client, ""
+            source = self.zetaris_factory()
+            source.sql("SELECT 1")
+        except NoSource as e:
+            return None, str(e)
+        except Exception as e:  # neither source puts credentials in its messages
+            return None, f"Open data source unreachable; lookup skipped ({type(e).__name__}: {str(e)[:160]})"
+        self._zetaris = source
+        return source, ""
+
+    # The old name, for callers written before the local database existed.
+    zetaris = data_source
+
+    def data_source_status(self) -> dict[str, Any]:
+        """The health endpoint's data_source block. A cached source that stops
+        answering is dropped, so the next question resolves again (in auto
+        mode, Zetaris down means the local database takes over)."""
+        from dalil import datasource
+
+        source, _ = self.data_source()
+        out = datasource.status(source)
+        if source is not None and not out["connected"]:
+            self._zetaris = None
+            source, _ = self.data_source()
+            out = datasource.status(source)
+        return out
 
     def recall(self, qid: str, question: str) -> Guidance:
         """Reviews of similar questions, from the review memory, and log what was used."""
@@ -163,10 +202,14 @@ class Pipeline:
             })
             rules = match_rules(q)
             if rules:
-                client, why = self.zetaris()
+                client, why = self.data_source()
                 run = (lambda sql: client.sql(sql, limit=200).dicts()) if client else None
-                data = run_rules(rules, run, why)
+                kind = _kind(client)
+                data = run_rules(rules, run, why, source=kind)
+                if client is not None and all(d.note.startswith("lookup failed") for d in data):
+                    self._zetaris = None  # resolve again next time; auto mode can fall back
                 self.store.event(qid, "data_looked_up", {
+                    "source": kind or None,
                     "tables": [d.table for d in data],
                     "rows": [len(d.rows) for d in data],
                     "notes": [d.note for d in data if d.note],
@@ -183,8 +226,8 @@ class Pipeline:
             "kinds": [s.get("kind", "claim") for s in draft],
         })
         if client is None and any("sql" in c for s in draft for c in s.get("citations") or []):
-            client, _ = self.zetaris()
-        verifier = Verifier(self.passages, zetaris_lookup(client) if client else None,
+            client, _ = self.data_source()
+        verifier = Verifier(self.passages, data_lookup(client) if client else None,
                             allowed_sql=[d.sql for d in data], allowed_uncited=FIXED_UNCITED,
                             allowed_passages=[h.passage_id for h in hits], titles=self.titles)
         check = verifier.check_answer(draft).to_dict()
@@ -197,6 +240,14 @@ class Pipeline:
         self.store.save_record(qid, retrieval, data_dicts, draft, check, status)
         self.store.event(qid, "queued", {"status": status})
         return Record(qid, q, screened.flags, status, retrieval, data_dicts, draft, check)
+
+
+def _kind(source: Any) -> str:
+    if source is None:
+        return ""
+    from dalil.datasource import kind_of
+
+    return kind_of(source)
 
 
 _default: Pipeline | None = None

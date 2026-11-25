@@ -1,10 +1,13 @@
-"""Open-data lookups that can back a sentence with a Zetaris query.
+"""Open-data lookups that can back a sentence with a fixed query.
 
 A small rule-based mapper: certain words in the question pick one fixed,
 parameter-free, read-only SELECT over a dalil.open_* table. Nothing from the
 question reaches the SQL. Each rule returns one row, and its `fact` template
 names the columns a drafter may state, so every number in the sentence is a
 value the verifier can rerun.
+
+The queries run on whichever source dalil.datasource picked, Zetaris or the
+local database; each result records which one, so the screen can say so.
 """
 
 from __future__ import annotations
@@ -33,13 +36,17 @@ class DataResult:
     rows: list[dict[str, Any]] = field(default_factory=list)
     note: str = ""
     fact: str | None = None
+    # "local" or "zetaris": the source that ran the query. Empty when none did.
+    source: str = ""
 
     def to_dict(self) -> dict[str, Any]:
-        return {"table": self.table, "sql": self.sql, "rows": self.rows, "note": self.note, "fact": self.fact}
+        return {"table": self.table, "sql": self.sql, "rows": self.rows, "note": self.note, "fact": self.fact,
+                "source": self.source}
 
     @classmethod
     def from_dict(cls, d: Mapping[str, Any]) -> "DataResult":
-        return cls(d["table"], d["sql"], list(d.get("rows") or []), d.get("note") or "", d.get("fact"))
+        return cls(d["table"], d["sql"], list(d.get("rows") or []), d.get("note") or "", d.get("fact"),
+                   d.get("source") or "")
 
 
 RULES: tuple[DataRule, ...] = (
@@ -71,11 +78,18 @@ RULES: tuple[DataRule, ...] = (
         "Emirates Health Services open data counts {exams} residency medical fitness exams in {year}.",
     ),
     DataRule(
+        # The file repeats Abu Dhabi's figures under Al-Ain, Delma and Madina
+        # Zayed, Sharjah's under Kalbaa and Khorfkan, and one free-zone figure
+        # under five names, and 2020 looks partial (data/open/README.md). So
+        # the sum counts each emirate's own row once and stops at 2019.
         "labour_complaints", re.compile(r"\bcomplain(?:t|ts|ing)?\b", re.I),
         "dalil.open_mohre_solved_complaints",
         "SELECT Year AS year, CAST(SUM(CAST(SolvedComplaints_count AS BIGINT)) AS BIGINT) AS solved "
-        "FROM dalil.open_mohre_solved_complaints GROUP BY Year ORDER BY Year DESC LIMIT 1",
-        "MOHRE open data records {solved} solved private-sector labour complaints in {year}.",
+        "FROM dalil.open_mohre_solved_complaints "
+        "WHERE City_En IN ('Abu Dhabi', 'Dubai', 'Sharjah', 'Ajman', 'Om-El-Quain', 'Ras El-Khaema', 'Fujiarah') "
+        "AND Year <= 2019 GROUP BY Year ORDER BY Year DESC LIMIT 1",
+        "MOHRE open data records {solved} solved private-sector labour complaints in {year}, "
+        "counting each emirate once.",
     ),
 )
 
@@ -96,20 +110,22 @@ def match_rules(question: str, rules: Iterable[DataRule] = RULES) -> list[DataRu
 SqlRunner = Callable[[str], Iterable[Mapping[str, Any]]]
 
 
-def run_rules(rules: Iterable[DataRule], run: SqlRunner | None, unavailable: str = "") -> list[DataResult]:
+def run_rules(rules: Iterable[DataRule], run: SqlRunner | None, unavailable: str = "",
+              source: str = "") -> list[DataResult]:
     """Run each rule's query. With no runner, or on a failure, the result has
-    no rows and a note saying why; the pipeline carries on without it."""
+    no rows and a note saying why; the pipeline carries on without it.
+    `source` names the backend that ran the queries ("local" or "zetaris")."""
     out = []
     for rule in rules:
-        res = DataResult(rule.table, rule.sql, fact=rule.fact)
+        res = DataResult(rule.table, rule.sql, fact=rule.fact, source=source if run is not None else "")
         if run is None:
-            res.note = unavailable or "Zetaris unavailable; lookup skipped"
+            res.note = unavailable or "Open data not configured; lookup skipped"
         else:
             try:
                 res.rows = [dict(r) for r in run(rule.sql)]
                 if not res.rows:
                     res.note = "query returned no rows"
-            except Exception as e:  # ZetarisError messages carry no credentials
+            except Exception as e:  # neither source puts credentials in its messages
                 res.note = f"lookup failed: {type(e).__name__}: {str(e)[:200]}"
         out.append(res)
     return out

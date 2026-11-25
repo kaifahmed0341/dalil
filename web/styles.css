@@ -85,6 +85,7 @@ code, pre { font-family: var(--mono); font-size: 13px; }
 
 .dot-ok { background: #1f8a3e; }
 .dot-bad { background: #c0392b; }
+.dot-off { background: #8a8f98; }
 .badge { font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 999px; }
 .badge-mock { background: var(--working-bg); color: var(--working-fg); }
 
