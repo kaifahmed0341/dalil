@@ -535,3 +535,13 @@ def test_a_passage_unrelated_to_a_data_claim_is_taken_off_it(tmp_path, local):
     assert [c.get("passage_id") for c in cits if "sql" not in c] == [QUOTE["passage_id"]]
     verified = next(e for e in p.store.get(rec.id)["audit"] if e["kind"] == "verified")
     assert verified["detail"]["unrelated_passages_dropped"] == 1
+
+
+def test_a_data_claim_lists_its_data_citation_first(tmp_path, local):
+    rule = next(r for r in RULES if r.name == "tasheel_centres")
+    p = scripted(tmp_path, local, [{
+        "text": "There are 49 Tasheel service centres in the UAE.", "kind": "claim",
+        "citations": [QUOTE, {"table": rule.table, "sql": rule.sql, "column": "centres", "value": "49"}]}])
+    rec = p.answer("How many Tasheel service centres are there?")
+    first = next(s for s in rec.check["sentences"] if s["kept"])
+    assert "sql" in first["citations"][0] and first["citations"][1].get("passage_id") == QUOTE["passage_id"]
