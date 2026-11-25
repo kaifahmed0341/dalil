@@ -37,6 +37,7 @@ from __future__ import annotations
 
 import json
 import re
+import string
 import unicodedata
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -241,7 +242,8 @@ DataLookup = Callable[[str], Iterable[Mapping[str, Any]]]
 class Verifier:
     def __init__(self, passages: Mapping[str, Mapping[str, Any]], data_lookup: DataLookup | None = None,
                  allowed_sql: Iterable[str] | None = None, allowed_uncited: Iterable[str] | None = None,
-                 allowed_passages: Iterable[str] | None = None, titles: Mapping[str, str] | None = None):
+                 allowed_passages: Iterable[str] | None = None, titles: Mapping[str, str] | None = None,
+                 data_facts: Mapping[str, str] | None = None):
         """`allowed_sql`: the queries the pipeline itself ran. A data citation must
         name one of them exactly, so a drafter cannot write its own SQL, such as
         `SELECT 1500 AS fee`, to back a number. `allowed_uncited`: the fixed
@@ -255,6 +257,9 @@ class Verifier:
         self.allowed_sql = None if allowed_sql is None else {fold(q)[0] for q in allowed_sql}
         self.allowed_uncited = None if allowed_uncited is None else {fold(t)[0] for t in allowed_uncited}
         self.allowed_passages = None if allowed_passages is None else set(allowed_passages)
+        # query -> the fixed sentence that says what its row means (dalil/opendata.py),
+        # such as "... counts {exams} residency medical fitness exams in {year}."
+        self.data_facts = {fold(q)[0]: f for q, f in (data_facts or {}).items() if f}
         # doc_id -> document title. A title such as "Federal Decree by Law No.
         # (45) of 2021" backs the law's own number and year in a claim.
         self.titles = dict(titles or {})
@@ -308,8 +313,11 @@ class Verifier:
             # sits in the same returned row. Only rows holding the cited value count.
             same_row = [str(rows[i][k]) for i in sorted(matched) for k in rows[i]
                         if k != column and rows[i][k] is not None]
+            # The rule's own sentence, filled from the rerun row, says what the
+            # value means, so a claim in other words can be checked against it.
+            meaning = _fill(self.data_facts.get(fold(sql)[0]), rows[min(matched)])
             return CitationCheck(True, "value returned by the query", cit,
-                                 evidence=" ".join([str(value), *same_row]), rows=matched)
+                                 evidence=" ".join([str(value), *same_row, meaning]), rows=matched)
         return CitationCheck(False, f"query did not return the cited value in column {column!r}", cit)
 
     def check_sentence(self, sentence: Mapping[str, Any]) -> SentenceCheck:
@@ -400,6 +408,16 @@ _WRITE_WORDS = re.compile(
     r"refresh|msck|load|set|use|call|exec|execute|describe|show)\b", re.IGNORECASE)
 _CALL = re.compile(r"\b(?:java_method|reflect|input_file_name|current_user|session_user|user)\s*\(", re.IGNORECASE)
 _TABLE_REF = re.compile(r"\b(?:from|join)\s+([A-Za-z_][\w.]*)", re.IGNORECASE)
+
+
+def _fill(template: str | None, row: Mapping[str, Any]) -> str:
+    """A fact template with its {column} slots filled from a row, or "" if any is missing."""
+    if not template:
+        return ""
+    slots = [f for _, f, _, _ in string.Formatter().parse(template) if f]
+    if any(row.get(s) in (None, "") for s in slots):
+        return ""
+    return template.format(**{s: row[s] for s in slots})
 
 
 def safe_select(sql: str, allowed_schema: str = "dalil") -> str:

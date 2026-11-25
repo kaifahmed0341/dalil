@@ -274,3 +274,76 @@ def test_a_year_from_the_same_rerun_row_backs_the_sentence(local):
     # A number in no returned row is still cut.
     bad = v.check_answer([{"text": "In 2024, EHS carried out 1424313 exams.", "citations": [cit]}])
     assert bad.status == "held" and "2024" in bad.sentences[0].reasons[0]
+
+
+# --- when the model's data sentence is cut -------------------------------------------
+
+
+class ScriptedDrafter:
+    """Returns fixed sentences, as a model might."""
+
+    def __init__(self, sentences):
+        self.sentences = sentences
+
+    def draft(self, question, hits, data, notes=()):
+        return [dict(s) for s in self.sentences]
+
+
+def scripted(tmp_path, local, sentences):
+    p = local_pipeline(tmp_path, local)
+    p.drafter = ScriptedDrafter(sentences)
+    return p
+
+
+MEDICAL = next(r for r in RULES if r.name == "medical_fitness")
+COMPLAINTS = next(r for r in RULES if r.name == "labour_complaints")
+QUOTE = {"passage_id": PASSAGES[1]["passage_id"],
+         "quote": "Renewal requests are made through the service centres or the official website of the authority."}
+
+
+def test_the_rule_meaning_backs_a_reworded_data_claim(local):
+    cit = {"table": MEDICAL.table, "sql": MEDICAL.sql, "column": "exams", "value": "1424313"}
+    v = Verifier({p["passage_id"]: dict(p) for p in PASSAGES}, data_lookup(local), allowed_sql=[MEDICAL.sql],
+                 data_facts={MEDICAL.sql: MEDICAL.fact})
+    claim = {"text": "In 2025, Emirates Health Services carried out 1424313 medical fitness exams for residency visas.",
+             "citations": [cit, QUOTE]}
+    assert v.check_answer([claim]).status == "pass"
+    # Without the rule's sentence the same claim fails the wording check, as it did before.
+    bare = Verifier({p["passage_id"]: dict(p) for p in PASSAGES}, data_lookup(local), allowed_sql=[MEDICAL.sql])
+    assert "not supported" in bare.check_answer([claim]).sentences[0].reasons[0]
+
+
+def test_a_cut_attempt_at_the_data_is_restated_with_the_rule_sentence(tmp_path, local):
+    # The model writes the numbers but cites only a passage, so the checker cuts it.
+    p = scripted(tmp_path, local, [
+        {"text": "Renewal requests are made through the service centres or the official website of the authority.",
+         "kind": "claim", "citations": [QUOTE]},
+        {"text": "MOHRE solves 207927 private-sector labour complaints in 2019.", "kind": "claim",
+         "citations": [QUOTE]},
+    ])
+    rec = p.answer("How many labour complaints does MOHRE solve? I want to renew my card.")
+    texts = {s["text"]: s["kept"] for s in rec.check["sentences"]}
+    assert texts["MOHRE solves 207927 private-sector labour complaints in 2019."] is False
+    fact = "MOHRE open data records 207927 solved private-sector labour complaints in 2019, counting each emirate once."
+    assert texts[fact] is True
+    verified = next(e for e in p.store.get(rec.id)["audit"] if e["kind"] == "verified")
+    assert verified["detail"]["data_restated"] == 1
+
+
+def test_data_the_model_left_alone_is_not_added(tmp_path, local):
+    p = scripted(tmp_path, local, [
+        {"text": "Renewal requests are made through the service centres or the official website of the authority.",
+         "kind": "claim", "citations": [QUOTE]},
+    ])
+    rec = p.answer("How many labour complaints does MOHRE solve? I want to renew my card.")
+    assert rec.data and rec.data[0]["rows"]
+    assert not any(any(c.get("sql") for c in s["citations"]) for s in rec.check["sentences"])
+
+
+def test_a_year_alone_does_not_count_as_stating_the_data(tmp_path, local):
+    p = scripted(tmp_path, local, [
+        {"text": "Renewal requests are made through the service centres or the official website of the authority "
+                 "in 2019.", "kind": "claim", "citations": [QUOTE]},
+    ])
+    rec = p.answer("How many labour complaints does MOHRE solve? I want to renew my card.")
+    assert not any(s.get("restated") for s in rec.draft)

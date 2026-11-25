@@ -18,7 +18,8 @@ from pathlib import Path
 from typing import Any, Callable
 
 from dalil import safety
-from dalil.draft import FEE_CAVEAT, LAW_CAVEAT, WEAK_REFUSAL, Drafter, ExtractiveDrafter, caveat, refusal
+from dalil.draft import (FEE_CAVEAT, LAW_CAVEAT, WEAK_REFUSAL, Drafter, ExtractiveDrafter, caveat, data_claims,
+                         refusal)
 from dalil.opendata import DataResult, match_rules, run_rules
 from dalil.retrieve import Hit, Searcher, make_retriever
 from dalil.store import Store
@@ -229,11 +230,18 @@ class Pipeline:
             client, _ = self.data_source()
         verifier = Verifier(self.passages, data_lookup(client) if client else None,
                             allowed_sql=[d.sql for d in data], allowed_uncited=FIXED_UNCITED,
-                            allowed_passages=[h.passage_id for h in hits], titles=self.titles)
+                            allowed_passages=[h.passage_id for h in hits], titles=self.titles,
+                            data_facts={d.sql: d.fact for d in data if d.fact})
         check = verifier.check_answer(draft).to_dict()
+        added = restate_data(draft, check, data)
+        if added:
+            draft = added
+            check = verifier.check_answer(draft).to_dict()
         kept = sum(s["kept"] for s in check["sentences"])
         self.store.event(qid, "verified", {"status": check["status"], "kept": kept,
-                                           "cut": len(check["sentences"]) - kept})
+                                           "cut": len(check["sentences"]) - kept,
+                                           **({"data_restated": sum(1 for s in draft if s.get("restated"))}
+                                              if added else {})})
         status = "held" if check["status"] == "held" else "awaiting_review"
         retrieval = [asdict(h) for h in hits]
         data_dicts = [d.to_dict() for d in data]
@@ -248,6 +256,46 @@ def _kind(source: Any) -> str:
     from dalil.datasource import kind_of
 
     return kind_of(source)
+
+
+def _numbers(text: str) -> set[str]:
+    from dalil.verify import numbers
+    return numbers(text)
+
+
+def restate_data(draft: list[dict[str, Any]], check: dict[str, Any], data: list[DataResult]
+                 ) -> list[dict[str, Any]] | None:
+    """A new draft when the model tried to state an open-data result but the
+    checker cut every sentence that carried it; else None.
+
+    "Tried" means a drafted claim cites the lookup's query or writes one of the
+    values in its row other than the year. The rule's own fixed sentence (dalil/opendata.py) then
+    states the value, with a citation the checker reruns like any other. The
+    model's cut sentence stays in the record for the reviewer to see. A lookup
+    the model left alone is left out: it judged the data off the question.
+    """
+    sentences = check.get("sentences", [])
+    out = list(draft)
+    extra = []
+    for res in data:
+        if not res.rows or not res.fact:
+            continue
+        carried = any(s["kept"] and any(c.get("ok") and c.get("sql") == res.sql for c in s.get("citations", []))
+                      for s in sentences)
+        if carried:
+            continue
+        # A year alone does not show intent: passage claims carry years too.
+        values = _numbers(" ".join(str(v) for k, v in res.rows[0].items() if v is not None and k.lower() != "year"))
+        tried = any(s.get("kind", "claim") == "claim" and (
+            any(c.get("sql") == res.sql for c in s.get("citations") or []) or _numbers(s.get("text", "")) & values)
+            for s in draft)
+        if tried:
+            extra += [{**claim, "restated": True} for claim in data_claims([res])]
+    if not extra:
+        return None
+    # After the model's claims, before the fixed caveats and refusals.
+    at = max((i + 1 for i, s in enumerate(out) if s.get("kind", "claim") == "claim"), default=0)
+    return out[:at] + extra + out[at:]
 
 
 _default: Pipeline | None = None
