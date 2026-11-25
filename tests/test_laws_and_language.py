@@ -675,3 +675,19 @@ def test_writer_schema_asks_for_an_english_version_only_for_arabic():
     numbered = {"S1": ("p", "The notice period must not be less than thirty days.")}
     assert "english" in LLMDrafter.schema(numbered, [], rendering=True)["properties"]["sentences"]["items"]["required"]
     assert "english" not in LLMDrafter.schema(numbered, [])["properties"]["sentences"]["items"]["properties"]
+
+
+def test_arabic_grammar_carries_one_and_two_and_idioms_do_not_negate():
+    p = passage("sample-rent:p4:1", "The Rent may not be increased before the lapse of two years, unless both "
+                "parties agree.", kind="html")
+    v = Verifier({p["passage_id"]: p}, similarity=lambda c, w: [0.9 for _ in w])
+    claim = {"text": "لا يجوز رفع الإيجار قبل انقضاء سنتين ما لم يتفق الطرفان.",
+             "text_en": "The Rent may not be increased before the lapse of two years unless both parties agree.",
+             "citations": [{"passage_id": p["passage_id"], "quote": p["text"]}]}
+    assert v.check_sentence(claim).kept
+    q = passage("sample-notice:p3:1", "The notice period must not be less than 30 days.", kind="html")
+    v2 = Verifier({q["passage_id"]: q}, similarity=lambda c, w: [0.9 for _ in w])
+    dropped = {"text": "يجب ألا تقل مدة الإشعار عن المدة المحددة.", "text_en": "The notice period must not be less than 30 days.",
+               "citations": [{"passage_id": q["passage_id"], "quote": q["text"]}]}
+    check = v2.check_sentence(dropped)
+    assert not check.kept and "leaves out numbers" in check.reasons[0]

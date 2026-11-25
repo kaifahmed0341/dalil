@@ -220,6 +220,15 @@ _SOFT_BACKING = {"غير": frozenset({"non"}), "دون": frozenset({"under", "be
 _DUN_AMOUNT = re.compile(r"دون\s+(?:سن|عمر|[\d\u0660-\u0669])")
 
 
+# Arabic phrases built on a negation word that do not negate: "ما لم"
+# (unless), "لا سيما" (especially), "لا بد" (must).
+_AR_IDIOMS = re.compile(r"ما\s+لم|لا\s*سي[ّ]?ما|لا\s+بد|لابد")
+
+
+def _without_idioms(text: str) -> str:
+    return _AR_IDIOMS.sub(" ", text)
+
+
 def _negations(words: set[str]) -> set[str]:
     """Negation words, also with one attached و, ف or ب: "فلا", "وبدون"."""
     found = set()
@@ -502,7 +511,7 @@ class Verifier:
                                               "single document: " + ", ".join(missing))
             # Negations count as one class: "cannot" is backed by a source's "will not".
             # "No." in "Law No. 45" is a law reference, not a negation.
-            added = sorted(_negations(_words(_LAW_NUMBER.sub(" ", text))))
+            added = sorted(_negations(_words(_without_idioms(_LAW_NUMBER.sub(" ", text)))))
             backing = _negations(_words(evidence))
             if not backing and added and set(added) <= _AR_SOFT_NEGATIONS:
                 # "غير" can be "non-" and "دون" "under"; English that says so backs them.
@@ -536,9 +545,14 @@ class Verifier:
         en_neg = _negations(_words(_LAW_NUMBER.sub(" ", en)))
         if en_neg and not _negations(_words(evidence)):
             problems.append("its English version adds a negation its sources do not have: " + ", ".join(sorted(en_neg)))
-        if numbers(text) != numbers(en):
-            problems.append("it does not have the same numbers as its English version")
-        ar_neg = {w for w in _negations(_words(text))
+        # Every number of the English version must be in the claim too. One and
+        # two are left out: Arabic often says them in the noun itself, "سنة"
+        # (a year), "الطرفين" (both parties). The claim's own numbers were
+        # checked against the sources above.
+        dropped = sorted(numbers(en) - numbers(text) - {"1", "2"}, key=lambda n: (len(n), n))
+        if dropped:
+            problems.append("it leaves out numbers its English version has: " + ", ".join(dropped))
+        ar_neg = {w for w in _negations(_words(_without_idioms(text)))
                   if not (w in _AR_SOFT_NEGATIONS and _words(en) & _SOFT_BACKING[w])}
         if bool(ar_neg) != bool(en_neg):
             problems.append("it negates where its English version does not, or the other way round")
