@@ -20,7 +20,7 @@ Dalil's pipeline follows the nodes of ITU-T Y.3172, the architectural framework 
 | Distributor (D) | Only approved, kept sentences go out | D-1 | Dimension 8, Collaboration with AI | Charter principle 7, Governance and Accountability |
 | Sink (SINK) | An append-only audit trail of every step; every review decision kept with the passages it judged | SINK-1 | Dimension 10, AI and Policies | Charter principle 7; National Strategy for AI 2031, Objective 8 |
 | Orchestrator (MLFO) | Pipeline settings: which models, which sources, which thresholds | | Standards factor | ITU-T Y.3172 |
-| Sandbox (SB) | The seven ITU scenarios, the 41-question citation evaluation and the unit tests, run before a change goes out | SB-1 | Sandbox Environments factor; dimension 9 | ITU-T Y.3172 |
+| Sandbox (SB) | The seven ITU scenarios, the 43-question citation evaluation and the unit tests, run before a change goes out | SB-1 | Sandbox Environments factor; dimension 9 | ITU-T Y.3172 |
 
 Where the mapping is a stretch, we say so. Y.3172's orchestrator places models across network levels, and Dalil's settings are an analogy for it. Its policy node fits closely: it "enables the application of policies to the output of the model node", which is what the checker and the reviewer do. Y.3172 has no node for provenance or for a human approver, so Dalil places both in the policy node; the report lists this as a standards gap.
 
@@ -122,16 +122,16 @@ On the laptop below, with Nemotron 3 Nano 4B drafting, against the code shown in
 | | Before | Now |
 |---|---|---|
 | Data-protection question cites Article 2(2), the exclusion, 10 runs | 1 | 10, in English and in Arabic |
-| ITU scenarios, English | 10 of 10 | 10 of 10 |
-| ITU scenarios, Arabic, 10 runs | not measured | 8 of the 10 steps 10 of 10; S7's two steps 9 and 8 of 10 |
-| Kept claims citing an expected document, 41 questions | 113 of 117 (0.966), 40 questions | 119 of 121 (0.983) |
-| "Can a Golden Visa holder sponsor their parents?", answers drawing only on the Golden Visa page, 10 runs | 0 | 10 |
+| ITU scenarios, English | 10 of 10 | 10 of 10, twice |
+| ITU scenarios, Arabic, 5 runs | not measured | 5 of 5 on every step |
+| Citation evaluation: kept claims citing an expected document and saying nothing their sources do not | 113 of 117 (0.966), 40 questions | 126 of 126, 43 questions |
+| "Can a Golden Visa holder sponsor their parents?", 10 runs: from the Golden Visa page, never claiming parents | 0 | 10 |
 | Numbers questions answered from the local open data, 70 runs | not available | 70 |
 | UK knowledge base scenarios, 30 runs | not available | 30 |
 | Median seconds per sourced answer on a quiet laptop | 10.2 | 10.2 |
 
 ```bash
-uv run python scripts/eval_citations.py                     # the 41 questions
+uv run python scripts/eval_citations.py                     # the 43 questions
 uv run python scripts/measure_data_protection.py --runs 10 --out build/dp.json "Does the UAE data protection law cover how a government entity handles my personal data?"
 uv run python scripts/measure_rejection_followup.py --runs 10   # S7, ten times
 uv run python scripts/calibrate_cross_language.py           # the checker's Arabic-to-English threshold

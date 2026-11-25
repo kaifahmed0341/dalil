@@ -9,16 +9,23 @@ Measured on an Apple M3 Pro laptop with 18 GB of memory, both models on its GPU 
 | Data-protection question cites Article 2(2), 10 runs, English | 1 | 10 |
 | Same, Arabic, quoting the lead-in with the list | 0 (it quoted item (b) alone) | 10 |
 | A Dubai law sentence kept without saying it is the Dubai law, 10 runs | 10 | 0 |
-| Seven ITU scenarios, English | 10 of 10, twice | 10 of 10 |
-| Seven ITU scenarios, Arabic, 10 runs | not measured | 8 steps 10 of 10; S7 step 1 9 of 10, step 2 8 of 10 |
+| Seven ITU scenarios, English | 10 of 10, twice | 10 of 10, twice |
+| Seven ITU scenarios, Arabic, 5 runs | not measured | 5 of 5 on every one of the ten steps |
 | S7 follow-up answered from other passages, 10 runs | English 10 | English 10, Arabic 10 |
-| S7 replaying the recording's rejection, 10 runs | 10 | 10 |
-| Kept claims citing an expected document, 41 questions | 113 of 117 (0.966), 40 questions | 119 of 121 (0.983) |
-| Answers with every kept claim right | 36 of 40 | 40 of 41 |
-| "Can a Golden Visa holder sponsor their parents?", answers from the Golden Visa page only, 10 runs | 0 | 10 |
+| Kept claims citing an expected document and saying nothing their sources do not | 113 of 117 (0.966), 40 questions | 126 of 126, 43 questions |
+| Answers with every kept claim right | 36 of 40 | 43 of 43 |
+| "Can a Golden Visa holder sponsor their parents?", 10 runs: answers from the Golden Visa page that never claim parents | 0 | 10 |
+| c05 (retirement visa) and c10 (medical conditions), 10 runs each, clean | not measured | 20 of 20 |
 | Numbers questions on the local database, 7 questions, 10 runs each | not available | 70 of 70 |
 | UK knowledge base scenarios, 6, 5 runs each | not available | 30 of 30 |
 | Median seconds per sourced answer, quiet laptop | 10.2 | 10.2 |
+
+The final column is commit `355bd32` for the scenarios, the 43 questions, the Golden Visa, c05 and c10 runs, and earlier commits of the same day for the rest, whose code paths did not change after them (the data-protection runs at `59bd4f9`, the open-data and UK runs at `dfc704f` and `59bd4f9`).
+
+Kept sentences per Arabic run at `355bd32`, out of those drafted (h: held for a person):
+- S2 step 1 (an Emirates ID in the question): 2/4, 0/4, 1/4h, 1/4h, 0/4. The ID is replaced and the Arabic warning goes out every time; the drafted sentences guess at the resident's own visa and are mostly cut.
+- S3 (renting in Dubai): 3/4, 3/4, 0/4, 2/4, 2/4. At `e93553c`, before the fixes below, 0 of 4 in 9 runs of 10, all held.
+- S7 step 2 (after a rejection): 3/4, 4/4, 3/4, 3/4, 3/4. At `e93553c`, held in 6 runs of 10.
 
 ### What changed, and why
 
@@ -55,13 +62,19 @@ Measured on an Apple M3 Pro laptop with 18 GB of memory, both models on its GPU 
 
 The model's writing is the whole cost: it runs at about 29 tokens a second on this laptop, and the prompt is mostly served from llama-server's cache. Flash attention is already on and every layer is on the GPU, so threads, batch size and mlock change nothing in steady use. Asking for compact JSON changed the answers and was not kept. The 13 to 15 seconds measured earlier were with other sessions on the same model servers. An Arabic question adds one short call for its English translation and writes each claim twice.
 
-### Arabic scenarios at `20f484a`
+### Faults the stage rehearsal found, and their fixes
 
-At `6071285`, Arabic S3 got the fixed refusal in 2 of 3 runs. The audit showed why: an Arabic reply carries an English version of each claim and ran to 670 tokens against a 700 cap, so a longer one was cut off mid-JSON, and the fallback, which matches words, could not quote English sources for an Arabic question. Arabic replies now get twice the cap, and a reply that is not JSON is asked for once more. Over 10 runs at `20f484a`: S1, S2 (both steps), S3, S4, S5, S6 (both steps) 10 of 10; S7 step 1 9 of 10 (a correct claim at similarity 0.53 was cut, so nothing went to the reviewer to reject), S7 step 2 8 of 10 (one miss follows from that, one held for a negation mismatch). Runs: 10, 8, 10, 10, 9, 10, 10, 10, 10, 10 of 10 steps.
+The rehearsal of 25 November at `20f484a` found that the checker let "Golden visa holders can sponsor their parents" through over the Golden Visa page's "family members, including spouses and children", and that Arabic S3, S2 step 1 and S7 step 2 passed their steps while sending little or nothing. Fixed since:
+- A claim that repeats a word of the question its sources do not carry is cut (words for the holder, and words that only say what kind of answer is wanted, do not count). The citation evaluation scores such a claim wrong; c41 to c43 test it.
+- An Arabic law year written "من عام 2007" or "لعام" is backed by the cited law's title, as "لسنة" was. The writer names a law briefly, only where its passage header gives it, and never copies a title or page header; a leading law-name sentence is set aside when the Arabic is compared with its English version.
+- "لا يمكن أن تكون أقل من" and similar are bounds, not negations; Latin words inside Arabic must be names from the sources; Cyrillic, Greek and CJK letters are cut.
+- When every claim is cut and no quote-only redraft stands in, the resident gets Dalil's fixed refusal and the reviewer still sees the cuts.
+- A fallback records its reason and, for a timeout, its limit. Arabic replies get twice the token cap, and a reply that is not JSON is asked for once more.
+- A passage from another page joins a named subject only if it shares two asked words, which closed c10.
 
 ### What is still wrong
 
-c10, "Which medical conditions make someone unfit for a UAE residence visa?", keeps two true sentences from the family-visa page about medical tests for dependents, which is not what was asked. Arabic S7 misses 1 to 2 runs in 10, as above. The Arabic S5 step passes in some runs with nothing sent: when the writer drafted a single claim, the scenario corrupts it and the checker cuts it, so the answer is held.
+Arabic S2 step 1 is sometimes held: the writer tries to answer the resident's question about their own visa, and the checker cuts most of what it drafts. The resident's ID is still replaced and the warning is shown.
 
 ## Earlier measurements
 

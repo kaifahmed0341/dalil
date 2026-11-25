@@ -1,20 +1,19 @@
 {
  "summary": {
-  "questions": 41,
+  "questions": 43,
   "runs": 1,
-  "answers": 41,
-  "answered": 41,
-  "found": 41,
-  "clean": 40,
-  "claims_kept": 121,
-  "claims_right": 119,
+  "answers": 43,
+  "answered": 43,
+  "found": 43,
+  "clean": 43,
+  "claims_kept": 126,
+  "claims_right": 126,
   "data_only_claims": 0,
-  "claim_precision": 0.983,
-  "seconds_median": 13.8,
-  "prompt_tokens_median": 1668,
-  "output_tokens_median": 216,
+  "claim_precision": 1.0,
+  "seconds_median": 14.4,
+  "prompt_tokens_median": 1643,
+  "output_tokens_median": 236,
   "drafters": [
-   "ExtractiveDrafter",
    "LLMDrafter"
   ]
  },
@@ -22,12 +21,13 @@
   {
    "id": "c01",
    "run": 1,
-   "seconds": 12.8,
+   "seconds": 14.1,
    "drafter": "LLMDrafter",
-   "prompt_tokens": 1669,
+   "prompt_tokens": 1723,
    "output_tokens": 216,
-   "prompt_ms": 4828.695,
-   "output_ms": 7371.078,
+   "prompt_ms": 5959.312,
+   "output_ms": 7471.131,
+   "fallback_reason": "",
    "status": "awaiting_review",
    "check": "pass",
    "kept": 4,
@@ -47,18 +47,20 @@
     ]
    ],
    "data_only": 0,
+   "said_what_sources_do_not": 0,
    "found": true,
    "clean": true
   },
   {
    "id": "c02",
    "run": 1,
-   "seconds": 6.9,
+   "seconds": 7.0,
    "drafter": "LLMDrafter",
    "prompt_tokens": 1257,
    "output_tokens": 55,
-   "prompt_ms": 4501.909,
-   "output_ms": 1949.268,
+   "prompt_ms": 4522.449,
+   "output_ms": 1914.987,
+   "fallback_reason": "",
    "status": "awaiting_review",
    "check": "pass",
    "kept": 1,
@@ -69,18 +71,20 @@
     ]
    ],
    "data_only": 0,
+   "said_what_sources_do_not": 0,
    "found": true,
    "clean": true
   },
   {
    "id": "c03",
    "run": 1,
-   "seconds": 11.3,
+   "seconds": 11.7,
    "drafter": "LLMDrafter",
-   "prompt_tokens": 1448,
+   "prompt_tokens": 1502,
    "output_tokens": 168,
-   "prompt_ms": 5029.788,
-   "output_ms": 5732.643,
+   "prompt_ms": 5194.867,
+   "output_ms": 5822.591,
+   "fallback_reason": "",
    "status": "awaiting_review",
    "check": "pass",
    "kept": 4,
@@ -100,18 +104,20 @@
     ]
    ],
    "data_only": 0,
+   "said_what_sources_do_not": 0,
    "found": true,
    "clean": true
   },
   {
    "id": "c04",
    "run": 1,
-   "seconds": 15.4,
+   "seconds": 16.9,
    "drafter": "LLMDrafter",
-   "prompt_tokens": 1017,
+   "prompt_tokens": 1071,
    "output_tokens": 320,
-   "prompt_ms": 3701.625,
-   "output_ms": 11094.829,
+   "prompt_ms": 5438.959,
+   "output_ms": 10841.202,
+   "fallback_reason": "",
    "status": "awaiting_review",
    "check": "pass",
    "kept": 4,
@@ -131,18 +137,20 @@
     ]
    ],
    "data_only": 0,
+   "said_what_sources_do_not": 0,
    "found": true,
    "clean": true
   },
   {
    "id": "c05",
    "run": 1,
-   "seconds": 18.4,
+   "seconds": 12.2,
    "drafter": "LLMDrafter",
-   "prompt_tokens": 1945,
-   "output_tokens": 337,
-   "prompt_ms": 6381.491,
-   "output_ms": 11525.286,
+   "prompt_tokens": 4,
+   "output_tokens": 313,
+   "prompt_ms": 397.235,
+   "output_ms": 10757.795,
+   "fallback_reason": "",
    "status": "awaiting_review",
    "check": "pass",
    "kept": 4,
@@ -162,18 +170,20 @@
     ]
    ],
    "data_only": 0,
+   "said_what_sources_do_not": 0,
    "found": true,
    "clean": true
   },
   {
    "id": "c06",
    "run": 1,
-   "seconds": 9.2,
+   "seconds": 8.5,
    "drafter": "LLMDrafter",
-   "prompt_tokens": 1852,
+   "prompt_tokens": 2019,
    "output_tokens": 73,
-   "prompt_ms": 6157.666,
-   "output_ms": 2504.074,
+   "prompt_ms": 5789.403,
+   "output_ms": 2513.591,
+   "fallback_reason": "",
    "status": "awaiting_review",
    "check": "pass",
    "kept": 1,
@@ -184,18 +194,20 @@
     ]
    ],
    "data_only": 0,
+   "said_what_sources_do_not": 0,
    "found": true,
    "clean": true
   },
   {
    "id": "c07",
    "run": 1,
-   "seconds": 13.9,
+   "seconds": 16.6,
    "drafter": "LLMDrafter",
-   "prompt_tokens": 1035,
-   "output_tokens": 285,
-   "prompt_ms": 3793.72,
-   "output_ms": 9552.327,
+   "prompt_tokens": 1089,
+   "output_tokens": 261,
+   "prompt_ms": 7035.342,
+   "output_ms": 8872.305,
+   "fallback_reason": "",
    "status": "awaiting_review",
    "check": "pass",
    "kept": 4,
@@ -215,23 +227,28 @@
     ]
    ],
    "data_only": 0,
+   "said_what_sources_do_not": 0,
    "found": true,
    "clean": true
   },
   {
    "id": "c08",
    "run": 1,
-   "seconds": 16.4,
+   "seconds": 15.9,
    "drafter": "LLMDrafter",
-   "prompt_tokens": 2074,
-   "output_tokens": 264,
-   "prompt_ms": 6801.582,
-   "output_ms": 9039.131,
+   "prompt_tokens": 2128,
+   "output_tokens": 236,
+   "prompt_ms": 7147.732,
+   "output_ms": 8138.065,
+   "fallback_reason": "",
    "status": "awaiting_review",
-   "check": "pass_with_cuts",
-   "kept": 3,
-   "right": 3,
+   "check": "pass",
+   "kept": 4,
+   "right": 4,
    "cited_docs": [
+    [
+     "uae-residence-visa-general-provisions"
+    ],
     [
      "uae-residence-visa-general-provisions"
     ],
@@ -243,18 +260,20 @@
     ]
    ],
    "data_only": 0,
+   "said_what_sources_do_not": 0,
    "found": true,
    "clean": true
   },
   {
    "id": "c09",
    "run": 1,
-   "seconds": 13.8,
+   "seconds": 16.5,
    "drafter": "LLMDrafter",
-   "prompt_tokens": 1834,
-   "output_tokens": 213,
-   "prompt_ms": 6311.729,
-   "output_ms": 7331.237,
+   "prompt_tokens": 1769,
+   "output_tokens": 237,
+   "prompt_ms": 7488.669,
+   "output_ms": 8302.169,
+   "fallback_reason": "",
    "status": "awaiting_review",
    "check": "pass",
    "kept": 4,
@@ -274,49 +293,44 @@
     ]
    ],
    "data_only": 0,
+   "said_what_sources_do_not": 0,
    "found": true,
    "clean": true
   },
   {
    "id": "c10",
    "run": 1,
-   "seconds": 12.3,
+   "seconds": 8.5,
    "drafter": "LLMDrafter",
-   "prompt_tokens": 1435,
-   "output_tokens": 207,
-   "prompt_ms": 5127.842,
-   "output_ms": 7019.478,
+   "prompt_tokens": 1546,
+   "output_tokens": 70,
+   "prompt_ms": 5411.529,
+   "output_ms": 2438.038,
+   "fallback_reason": "",
    "status": "awaiting_review",
    "check": "pass",
-   "kept": 4,
-   "right": 2,
+   "kept": 1,
+   "right": 1,
    "cited_docs": [
     [
      "uae-health-conditions-residence-visa"
-    ],
-    [
-     "uae-residence-visa-general-provisions"
-    ],
-    [
-     "uae-family-residence-visa"
-    ],
-    [
-     "uae-family-residence-visa"
     ]
    ],
    "data_only": 0,
+   "said_what_sources_do_not": 0,
    "found": true,
-   "clean": false
+   "clean": true
   },
   {
    "id": "c11",
    "run": 1,
-   "seconds": 14.7,
+   "seconds": 14.8,
    "drafter": "LLMDrafter",
-   "prompt_tokens": 1589,
+   "prompt_tokens": 1643,
    "output_tokens": 258,
-   "prompt_ms": 5422.38,
-   "output_ms": 8731.878,
+   "prompt_ms": 5839.388,
+   "output_ms": 8844.373,
+   "fallback_reason": "",
    "status": "awaiting_review",
    "check": "pass",
    "kept": 4,
@@ -336,18 +350,20 @@
     ]
    ],
    "data_only": 0,
+   "said_what_sources_do_not": 0,
    "found": true,
    "clean": true
   },
   {
    "id": "c12",
    "run": 1,
-   "seconds": 10.4,
+   "seconds": 10.3,
    "drafter": "LLMDrafter",
-   "prompt_tokens": 1626,
+   "prompt_tokens": 1478,
    "output_tokens": 127,
-   "prompt_ms": 5540.466,
-   "output_ms": 4318.419,
+   "prompt_ms": 5330.662,
+   "output_ms": 4365.904,
+   "fallback_reason": "",
    "status": "awaiting_review",
    "check": "pass",
    "kept": 4,
@@ -367,18 +383,20 @@
     ]
    ],
    "data_only": 0,
+   "said_what_sources_do_not": 0,
    "found": true,
    "clean": true
   },
   {
    "id": "c13",
    "run": 1,
-   "seconds": 9.8,
+   "seconds": 10.1,
    "drafter": "LLMDrafter",
-   "prompt_tokens": 1043,
+   "prompt_tokens": 1097,
    "output_tokens": 157,
-   "prompt_ms": 3896.579,
-   "output_ms": 5360.635,
+   "prompt_ms": 4236.009,
+   "output_ms": 5347.303,
+   "fallback_reason": "",
    "status": "awaiting_review",
    "check": "pass",
    "kept": 1,
@@ -389,6 +407,7 @@
     ]
    ],
    "data_only": 0,
+   "said_what_sources_do_not": 0,
    "found": true,
    "clean": true
   },
@@ -397,10 +416,11 @@
    "run": 1,
    "seconds": 18.3,
    "drafter": "LLMDrafter",
-   "prompt_tokens": 2192,
-   "output_tokens": 309,
-   "prompt_ms": 7096.794,
-   "output_ms": 10531.883,
+   "prompt_tokens": 2246,
+   "output_tokens": 300,
+   "prompt_ms": 7423.766,
+   "output_ms": 10379.494,
+   "fallback_reason": "",
    "status": "awaiting_review",
    "check": "pass_with_cuts",
    "kept": 3,
@@ -417,18 +437,20 @@
     ]
    ],
    "data_only": 0,
+   "said_what_sources_do_not": 0,
    "found": true,
    "clean": true
   },
   {
    "id": "c15",
    "run": 1,
-   "seconds": 15.7,
+   "seconds": 14.9,
    "drafter": "LLMDrafter",
-   "prompt_tokens": 1948,
-   "output_tokens": 269,
-   "prompt_ms": 6368.218,
-   "output_ms": 9179.617,
+   "prompt_tokens": 1562,
+   "output_tokens": 285,
+   "prompt_ms": 4509.956,
+   "output_ms": 9699.712,
+   "fallback_reason": "",
    "status": "awaiting_review",
    "check": "pass_with_cuts",
    "kept": 2,
@@ -442,18 +464,20 @@
     ]
    ],
    "data_only": 0,
+   "said_what_sources_do_not": 0,
    "found": true,
    "clean": true
   },
   {
    "id": "c16",
    "run": 1,
-   "seconds": 13.6,
+   "seconds": 14.3,
    "drafter": "LLMDrafter",
    "prompt_tokens": 1801,
-   "output_tokens": 207,
-   "prompt_ms": 5818.827,
-   "output_ms": 7042.175,
+   "output_tokens": 228,
+   "prompt_ms": 6298.948,
+   "output_ms": 7744.583,
+   "fallback_reason": "",
    "status": "awaiting_review",
    "check": "pass",
    "kept": 4,
@@ -473,99 +497,101 @@
     ]
    ],
    "data_only": 0,
+   "said_what_sources_do_not": 0,
    "found": true,
    "clean": true
   },
   {
    "id": "c17",
    "run": 1,
-   "seconds": 11.3,
+   "seconds": 12.6,
    "drafter": "LLMDrafter",
    "prompt_tokens": 1441,
-   "output_tokens": 156,
-   "prompt_ms": 5093.316,
-   "output_ms": 5523.961,
-   "status": "awaiting_review",
-   "check": "pass",
-   "kept": 3,
-   "right": 3,
+   "output_tokens": 215,
+   "prompt_ms": 5110.268,
+   "output_ms": 7333.411,
+   "fallback_reason": "",
+   "status": "held",
+   "check": "held",
+   "kept": 1,
+   "right": 1,
    "cited_docs": [
     [
-     "uae-payment-of-wages"
-    ],
-    [
-     "uae-payment-of-wages"
-    ],
-    [
-     "uae-payment-of-wages"
+     "uaelegislation-federal-decree-law-33-2021-labour-relations-en"
     ]
    ],
    "data_only": 0,
+   "said_what_sources_do_not": 0,
    "found": true,
    "clean": true
   },
   {
    "id": "c18",
    "run": 1,
-   "seconds": 15.3,
+   "seconds": 15.4,
    "drafter": "LLMDrafter",
    "prompt_tokens": 1641,
-   "output_tokens": 268,
-   "prompt_ms": 5613.448,
-   "output_ms": 9248.552,
-   "status": "awaiting_review",
-   "check": "pass",
-   "kept": 4,
-   "right": 4,
+   "output_tokens": 264,
+   "prompt_ms": 5690.63,
+   "output_ms": 9029.039,
+   "fallback_reason": "",
+   "status": "held",
+   "check": "held",
+   "kept": 1,
+   "right": 1,
    "cited_docs": [
-    [
-     "uae-payment-of-wages"
-    ],
-    [
-     "uae-payment-of-wages"
-    ],
-    [
-     "uae-payment-of-wages"
-    ],
     [
      "uae-payment-of-wages"
     ]
    ],
    "data_only": 0,
+   "said_what_sources_do_not": 0,
    "found": true,
    "clean": true
   },
   {
    "id": "c19",
    "run": 1,
-   "seconds": 7.8,
+   "seconds": 7.7,
    "drafter": "LLMDrafter",
    "prompt_tokens": 1318,
    "output_tokens": 73,
-   "prompt_ms": 4726.178,
-   "output_ms": 2556.622,
+   "prompt_ms": 4661.697,
+   "output_ms": 2526.363,
+   "fallback_reason": "",
    "status": "awaiting_review",
    "check": "pass",
-   "kept": 1,
-   "right": 1,
+   "kept": 4,
+   "right": 4,
    "cited_docs": [
+    [
+     "uae-unemployment-insurance"
+    ],
+    [
+     "uae-unemployment-insurance"
+    ],
+    [
+     "uae-unemployment-insurance"
+    ],
     [
      "uae-unemployment-insurance"
     ]
    ],
    "data_only": 0,
+   "said_what_sources_do_not": 0,
    "found": true,
    "clean": true
   },
   {
    "id": "c20",
    "run": 1,
-   "seconds": 11.7,
+   "seconds": 12.1,
    "drafter": "LLMDrafter",
    "prompt_tokens": 1313,
-   "output_tokens": 186,
-   "prompt_ms": 4685.947,
-   "output_ms": 6350.942,
+   "output_tokens": 195,
+   "prompt_ms": 4771.335,
+   "output_ms": 6643.31,
+   "fallback_reason": "",
    "status": "awaiting_review",
    "check": "pass",
    "kept": 4,
@@ -585,26 +611,25 @@
     ]
    ],
    "data_only": 0,
+   "said_what_sources_do_not": 0,
    "found": true,
    "clean": true
   },
   {
    "id": "c21",
    "run": 1,
-   "seconds": 13.5,
+   "seconds": 16.4,
    "drafter": "LLMDrafter",
-   "prompt_tokens": 1794,
-   "output_tokens": 190,
-   "prompt_ms": 5919.384,
-   "output_ms": 6503.565,
+   "prompt_tokens": 1848,
+   "output_tokens": 266,
+   "prompt_ms": 6301.333,
+   "output_ms": 9089.662,
+   "fallback_reason": "",
    "status": "awaiting_review",
    "check": "pass",
-   "kept": 4,
-   "right": 4,
+   "kept": 3,
+   "right": 3,
    "cited_docs": [
-    [
-     "uae-work-permits"
-    ],
     [
      "uae-work-permits"
     ],
@@ -616,18 +641,20 @@
     ]
    ],
    "data_only": 0,
+   "said_what_sources_do_not": 0,
    "found": true,
    "clean": true
   },
   {
    "id": "c22",
    "run": 1,
-   "seconds": 15.7,
+   "seconds": 15.1,
    "drafter": "LLMDrafter",
-   "prompt_tokens": 1774,
-   "output_tokens": 291,
-   "prompt_ms": 5119.571,
-   "output_ms": 9996.613,
+   "prompt_tokens": 1828,
+   "output_tokens": 252,
+   "prompt_ms": 5948.898,
+   "output_ms": 8498.152,
+   "fallback_reason": "",
    "status": "awaiting_review",
    "check": "pass",
    "kept": 4,
@@ -647,20 +674,52 @@
     ]
    ],
    "data_only": 0,
+   "said_what_sources_do_not": 0,
    "found": true,
    "clean": true
   },
   {
    "id": "c23",
    "run": 1,
-   "seconds": 12.4,
+   "seconds": 13.4,
    "drafter": "LLMDrafter",
-   "prompt_tokens": 2137,
-   "output_tokens": 144,
-   "prompt_ms": 6957.503,
-   "output_ms": 5024.427,
+   "prompt_tokens": 2191,
+   "output_tokens": 163,
+   "prompt_ms": 7276.528,
+   "output_ms": 5592.757,
+   "fallback_reason": "",
    "status": "awaiting_review",
    "check": "pass",
+   "kept": 3,
+   "right": 3,
+   "cited_docs": [
+    [
+     "uae-employment-contracts"
+    ],
+    [
+     "uae-employment-contracts"
+    ],
+    [
+     "uae-employment-contracts"
+    ]
+   ],
+   "data_only": 0,
+   "said_what_sources_do_not": 0,
+   "found": true,
+   "clean": true
+  },
+  {
+   "id": "c24",
+   "run": 1,
+   "seconds": 16.5,
+   "drafter": "LLMDrafter",
+   "prompt_tokens": 1656,
+   "output_tokens": 300,
+   "prompt_ms": 5654.028,
+   "output_ms": 10113.672,
+   "fallback_reason": "",
+   "status": "awaiting_review",
+   "check": "pass_with_cuts",
    "kept": 2,
    "right": 2,
    "cited_docs": [
@@ -672,49 +731,20 @@
     ]
    ],
    "data_only": 0,
-   "found": true,
-   "clean": true
-  },
-  {
-   "id": "c24",
-   "run": 1,
-   "seconds": 15.0,
-   "drafter": "LLMDrafter",
-   "prompt_tokens": 1656,
-   "output_tokens": 273,
-   "prompt_ms": 5550.644,
-   "output_ms": 9326.238,
-   "status": "awaiting_review",
-   "check": "pass",
-   "kept": 4,
-   "right": 4,
-   "cited_docs": [
-    [
-     "uae-employment-contracts"
-    ],
-    [
-     "uae-employment-contracts"
-    ],
-    [
-     "uae-employment-contracts"
-    ],
-    [
-     "uaelegislation-federal-decree-law-33-2021-labour-relations-en"
-    ]
-   ],
-   "data_only": 0,
+   "said_what_sources_do_not": 0,
    "found": true,
    "clean": true
   },
   {
    "id": "c25",
    "run": 1,
-   "seconds": 14.1,
+   "seconds": 15.9,
    "drafter": "LLMDrafter",
    "prompt_tokens": 1478,
-   "output_tokens": 245,
-   "prompt_ms": 5137.03,
-   "output_ms": 8386.53,
+   "output_tokens": 283,
+   "prompt_ms": 5419.765,
+   "output_ms": 9779.56,
+   "fallback_reason": "",
    "status": "awaiting_review",
    "check": "pass_with_cuts",
    "kept": 3,
@@ -731,26 +761,25 @@
     ]
    ],
    "data_only": 0,
+   "said_what_sources_do_not": 0,
    "found": true,
    "clean": true
   },
   {
    "id": "c26",
    "run": 1,
-   "seconds": 15.2,
+   "seconds": 15.7,
    "drafter": "LLMDrafter",
    "prompt_tokens": 1660,
-   "output_tokens": 268,
-   "prompt_ms": 5491.006,
-   "output_ms": 9193.235,
+   "output_tokens": 287,
+   "prompt_ms": 5409.744,
+   "output_ms": 9727.379,
+   "fallback_reason": "",
    "status": "awaiting_review",
    "check": "pass_with_cuts",
-   "kept": 3,
-   "right": 3,
+   "kept": 2,
+   "right": 2,
    "cited_docs": [
-    [
-     "uae-terminating-employment-contracts"
-    ],
     [
      "uae-terminating-employment-contracts"
     ],
@@ -759,18 +788,20 @@
     ]
    ],
    "data_only": 0,
+   "said_what_sources_do_not": 0,
    "found": true,
    "clean": true
   },
   {
    "id": "c27",
    "run": 1,
-   "seconds": 16.0,
+   "seconds": 16.4,
    "drafter": "LLMDrafter",
    "prompt_tokens": 1668,
-   "output_tokens": 281,
-   "prompt_ms": 5630.215,
-   "output_ms": 9677.389,
+   "output_tokens": 306,
+   "prompt_ms": 5766.544,
+   "output_ms": 10467.837,
+   "fallback_reason": "",
    "status": "awaiting_review",
    "check": "pass_with_cuts",
    "kept": 3,
@@ -787,18 +818,20 @@
     ]
    ],
    "data_only": 0,
+   "said_what_sources_do_not": 0,
    "found": true,
    "clean": true
   },
   {
    "id": "c28",
    "run": 1,
-   "seconds": 12.8,
+   "seconds": 14.4,
    "drafter": "LLMDrafter",
    "prompt_tokens": 1413,
-   "output_tokens": 213,
-   "prompt_ms": 4904.058,
-   "output_ms": 7335.973,
+   "output_tokens": 256,
+   "prompt_ms": 5040.666,
+   "output_ms": 8633.942,
+   "fallback_reason": "",
    "status": "awaiting_review",
    "check": "pass",
    "kept": 4,
@@ -818,18 +851,20 @@
     ]
    ],
    "data_only": 0,
+   "said_what_sources_do_not": 0,
    "found": true,
    "clean": true
   },
   {
    "id": "c29",
    "run": 1,
-   "seconds": 13.4,
+   "seconds": 13.2,
    "drafter": "LLMDrafter",
-   "prompt_tokens": 1226,
-   "output_tokens": 216,
-   "prompt_ms": 4743.777,
-   "output_ms": 7385.741,
+   "prompt_tokens": 1280,
+   "output_tokens": 217,
+   "prompt_ms": 4684.173,
+   "output_ms": 7320.362,
+   "fallback_reason": "",
    "status": "awaiting_review",
    "check": "pass",
    "kept": 4,
@@ -849,85 +884,110 @@
     ]
    ],
    "data_only": 0,
+   "said_what_sources_do_not": 0,
    "found": true,
    "clean": true
   },
   {
    "id": "c30",
    "run": 1,
-   "seconds": 8.8,
+   "seconds": 14.1,
    "drafter": "LLMDrafter",
-   "prompt_tokens": 1537,
-   "output_tokens": 101,
-   "prompt_ms": 4749.101,
-   "output_ms": 3494.563,
+   "prompt_tokens": 1591,
+   "output_tokens": 246,
+   "prompt_ms": 5557.655,
+   "output_ms": 8321.709,
+   "fallback_reason": "",
    "status": "awaiting_review",
    "check": "pass",
-   "kept": 1,
-   "right": 1,
+   "kept": 4,
+   "right": 4,
    "cited_docs": [
+    [
+     "uae-start-business-free-zone"
+    ],
+    [
+     "uae-start-business-free-zone"
+    ],
+    [
+     "uae-start-business-free-zone"
+    ],
     [
      "uae-start-business-free-zone"
     ]
    ],
    "data_only": 0,
+   "said_what_sources_do_not": 0,
    "found": true,
    "clean": true
   },
   {
    "id": "c31",
    "run": 1,
-   "seconds": 9.9,
+   "seconds": 11.1,
    "drafter": "LLMDrafter",
-   "prompt_tokens": 1981,
-   "output_tokens": 73,
-   "prompt_ms": 6608.371,
-   "output_ms": 2604.444,
+   "prompt_tokens": 2035,
+   "output_tokens": 104,
+   "prompt_ms": 6852.239,
+   "output_ms": 3573.909,
+   "fallback_reason": "",
    "status": "awaiting_review",
    "check": "pass",
    "kept": 1,
    "right": 1,
    "cited_docs": [
     [
-     "uae-data-protection-laws"
+     "uaelegislation-federal-decree-law-45-2021-personal-data-protection-en"
     ]
    ],
    "data_only": 0,
+   "said_what_sources_do_not": 0,
    "found": true,
    "clean": true
   },
   {
    "id": "c32",
    "run": 1,
-   "seconds": 12.7,
+   "seconds": 17.1,
    "drafter": "LLMDrafter",
-   "prompt_tokens": 2075,
-   "output_tokens": 153,
-   "prompt_ms": 6846.581,
-   "output_ms": 5356.103,
+   "prompt_tokens": 2129,
+   "output_tokens": 273,
+   "prompt_ms": 7203.598,
+   "output_ms": 9321.475,
+   "fallback_reason": "",
    "status": "awaiting_review",
-   "check": "pass_with_cuts",
-   "kept": 1,
-   "right": 1,
+   "check": "pass",
+   "kept": 4,
+   "right": 4,
    "cited_docs": [
     [
-     "uae-data-protection-laws",
+     "uaelegislation-federal-decree-law-45-2021-personal-data-protection-en"
+    ],
+    [
+     "uaelegislation-federal-decree-law-45-2021-personal-data-protection-en"
+    ],
+    [
+     "uaelegislation-federal-decree-law-45-2021-personal-data-protection-en"
+    ],
+    [
      "uaelegislation-federal-decree-law-45-2021-personal-data-protection-en"
     ]
    ],
    "data_only": 0,
+   "said_what_sources_do_not": 0,
    "found": true,
    "clean": true
   },
   {
    "id": "c33",
    "run": 1,
-   "seconds": 8.2,
+   "seconds": 9.3,
    "drafter": "LLMDrafter",
    "prompt_tokens": 1625,
-   "output_tokens": 94,
-   "prompt_ms": 4712.899,
-   "output_ms": 3279.793,
+   "output_tokens": 90,
+   "prompt_ms": 5605.862,
+   "output_ms": 3080.681,
+   "fallback_reason": "",
    "status": "awaiting_review",
    "check": "pass",
    "kept": 1,
@@ -938,6 +998,7 @@
     ]
    ],
    "data_only": 0,
+   "said_what_sources_do_not": 0,
    "found": true,
    "clean": true
   },
@@ -946,10 +1007,11 @@
    "run": 1,
    "seconds": 15.7,
    "drafter": "LLMDrafter",
-   "prompt_tokens": 2233,
+   "prompt_tokens": 2287,
    "output_tokens": 213,
-   "prompt_ms": 7314.073,
-   "output_ms": 7301.942,
+   "prompt_ms": 7620.484,
+   "output_ms": 7273.691,
+   "fallback_reason": "",
    "status": "awaiting_review",
    "check": "pass",
    "kept": 4,
@@ -969,18 +1031,20 @@
     ]
    ],
    "data_only": 0,
+   "said_what_sources_do_not": 0,
    "found": true,
    "clean": true
   },
   {
    "id": "c35",
    "run": 1,
-   "seconds": 14.1,
+   "seconds": 13.3,
    "drafter": "LLMDrafter",
-   "prompt_tokens": 1898,
+   "prompt_tokens": 1952,
    "output_tokens": 221,
-   "prompt_ms": 6325.816,
-   "output_ms": 7555.876,
+   "prompt_ms": 5577.832,
+   "output_ms": 7530.517,
+   "fallback_reason": "",
    "status": "awaiting_review",
    "check": "pass_with_cuts",
    "kept": 3,
@@ -997,54 +1061,49 @@
     ]
    ],
    "data_only": 0,
+   "said_what_sources_do_not": 0,
    "found": true,
    "clean": true
   },
   {
    "id": "c36",
    "run": 1,
-   "seconds": 16.7,
+   "seconds": 12.8,
    "drafter": "LLMDrafter",
-   "prompt_tokens": 2078,
-   "output_tokens": 279,
-   "prompt_ms": 6784.004,
-   "output_ms": 9716.563,
+   "prompt_tokens": 2132,
+   "output_tokens": 154,
+   "prompt_ms": 6987.418,
+   "output_ms": 5245.47,
+   "fallback_reason": "",
    "status": "awaiting_review",
    "check": "pass",
-   "kept": 3,
-   "right": 3,
+   "kept": 1,
+   "right": 1,
    "cited_docs": [
-    [
-     "dubai-data-law-26-2015"
-    ],
-    [
-     "dubai-data-law-26-2015"
-    ],
     [
      "dubai-data-law-26-2015"
     ]
    ],
    "data_only": 0,
+   "said_what_sources_do_not": 0,
    "found": true,
    "clean": true
   },
   {
    "id": "c37",
    "run": 1,
-   "seconds": 15.6,
+   "seconds": 15.7,
    "drafter": "LLMDrafter",
-   "prompt_tokens": 1842,
-   "output_tokens": 263,
-   "prompt_ms": 5912.093,
-   "output_ms": 9026.265,
+   "prompt_tokens": 1896,
+   "output_tokens": 257,
+   "prompt_ms": 6389.732,
+   "output_ms": 8677.648,
+   "fallback_reason": "",
    "status": "awaiting_review",
-   "check": "pass",
-   "kept": 4,
-   "right": 4,
+   "check": "pass_with_cuts",
+   "kept": 3,
+   "right": 3,
    "cited_docs": [
-    [
-     "uae-national-digital-accessibility-policy"
-    ],
     [
      "uae-national-digital-accessibility-policy"
     ],
@@ -1056,6 +1115,7 @@
     ]
    ],
    "data_only": 0,
+   "said_what_sources_do_not": 0,
    "found": true,
    "clean": true
   },
@@ -1064,10 +1124,11 @@
    "run": 1,
    "seconds": 15.0,
    "drafter": "LLMDrafter",
-   "prompt_tokens": 2296,
-   "output_tokens": 232,
-   "prompt_ms": 6536.673,
-   "output_ms": 7899.409,
+   "prompt_tokens": 2350,
+   "output_tokens": 230,
+   "prompt_ms": 6690.022,
+   "output_ms": 7868.445,
+   "fallback_reason": "",
    "status": "awaiting_review",
    "check": "pass",
    "kept": 2,
@@ -1081,23 +1142,28 @@
     ]
    ],
    "data_only": 0,
+   "said_what_sources_do_not": 0,
    "found": true,
    "clean": true
   },
   {
    "id": "c39",
    "run": 1,
-   "seconds": 30.9,
-   "drafter": "ExtractiveDrafter",
-   "prompt_tokens": 1856,
-   "output_tokens": 700,
-   "prompt_ms": 5599.92,
-   "output_ms": 23644.866,
+   "seconds": 71.0,
+   "drafter": "LLMDrafter",
+   "prompt_tokens": 4,
+   "output_tokens": 477,
+   "prompt_ms": 70.479,
+   "output_ms": 16102.565,
+   "fallback_reason": "",
    "status": "awaiting_review",
-   "check": "pass",
-   "kept": 2,
-   "right": 2,
+   "check": "pass_with_cuts",
+   "kept": 3,
+   "right": 3,
    "cited_docs": [
+    [
+     "uae-unified-digital-platform-policy-ar"
+    ],
     [
      "uae-unified-digital-platform-policy-ar"
     ],
@@ -1106,18 +1172,20 @@
     ]
    ],
    "data_only": 0,
+   "said_what_sources_do_not": 0,
    "found": true,
    "clean": true
   },
   {
    "id": "c40",
    "run": 1,
-   "seconds": 13.8,
+   "seconds": 13.4,
    "drafter": "LLMDrafter",
-   "prompt_tokens": 2340,
-   "output_tokens": 149,
-   "prompt_ms": 7652.46,
-   "output_ms": 5099.681,
+   "prompt_tokens": 2394,
+   "output_tokens": 116,
+   "prompt_ms": 7887.976,
+   "output_ms": 3965.504,
+   "fallback_reason": "",
    "status": "awaiting_review",
    "check": "pass",
    "kept": 1,
@@ -1128,18 +1196,20 @@
     ]
    ],
    "data_only": 0,
+   "said_what_sources_do_not": 0,
    "found": true,
    "clean": true
   },
   {
    "id": "c41",
    "run": 1,
-   "seconds": 14.9,
+   "seconds": 15.0,
    "drafter": "LLMDrafter",
-   "prompt_tokens": 1269,
-   "output_tokens": 274,
-   "prompt_ms": 5453.079,
-   "output_ms": 9261.293,
+   "prompt_tokens": 1094,
+   "output_tokens": 319,
+   "prompt_ms": 4161.698,
+   "output_ms": 10664.916,
+   "fallback_reason": "",
    "status": "awaiting_review",
    "check": "pass",
    "kept": 4,
@@ -1159,6 +1229,73 @@
     ]
    ],
    "data_only": 0,
+   "said_what_sources_do_not": 0,
+   "found": true,
+   "clean": true
+  },
+  {
+   "id": "c42",
+   "run": 1,
+   "seconds": 14.7,
+   "drafter": "LLMDrafter",
+   "prompt_tokens": 1671,
+   "output_tokens": 251,
+   "prompt_ms": 5680.124,
+   "output_ms": 8440.784,
+   "fallback_reason": "",
+   "status": "awaiting_review",
+   "check": "pass",
+   "kept": 4,
+   "right": 4,
+   "cited_docs": [
+    [
+     "uae-family-residence-visa"
+    ],
+    [
+     "uae-family-residence-visa"
+    ],
+    [
+     "uae-family-residence-visa"
+    ],
+    [
+     "uae-green-visa"
+    ]
+   ],
+   "data_only": 0,
+   "said_what_sources_do_not": 0,
+   "found": true,
+   "clean": true
+  },
+  {
+   "id": "c43",
+   "run": 1,
+   "seconds": 4.4,
+   "drafter": "LLMDrafter",
+   "prompt_tokens": 607,
+   "output_tokens": 53,
+   "prompt_ms": 1789.398,
+   "output_ms": 1783.141,
+   "fallback_reason": "",
+   "status": "awaiting_review",
+   "check": "pass",
+   "kept": 4,
+   "right": 4,
+   "cited_docs": [
+    [
+     "uae-golden-visa"
+    ],
+    [
+     "uae-golden-visa"
+    ],
+    [
+     "uae-golden-visa"
+    ],
+    [
+     "uae-golden-visa"
+    ]
+   ],
+   "data_only": 0,
+   "said_what_sources_do_not": 0,
    "found": true,
    "clean": true
   }

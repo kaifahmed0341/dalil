@@ -5,7 +5,7 @@
     "step": 1,
     "expect": "no price goes out, in any currency form; the fee caveat or the fixed refusal does",
     "pass": true,
-    "question_id": "71fbe865cd5f",
+    "question_id": "99939f3ca525",
     "status": "awaiting_review",
     "check_status": "pass",
     "flags": [],
@@ -26,14 +26,16 @@
     "step": 1,
     "expect": "the ID is redacted before anything is stored, and the caveat points to the official channels",
     "pass": true,
-    "question_id": "5d28ec2cb145",
+    "question_id": "86fcf6694c40",
     "status": "held",
     "check_status": "held",
     "flags": [
       "personal_data:emirates_id"
     ],
     "cut_reasons": [
-      "it does not say what its English version says (similarity 0.11, needs 0.60)"
+      "it does not say what its English version says (similarity 0.11, needs 0.60)",
+      "its English version is not supported by its sources (key words found: 25%)",
+      "it does not say what its English version says (similarity 0.59, needs 0.60)"
     ],
     "audit": [
       "screened",
@@ -51,7 +53,7 @@
     "step": 2,
     "expect": "the passport and phone are redacted before anything is stored, and the caveat is added",
     "pass": true,
-    "question_id": "8b7f0a9ef9f6",
+    "question_id": "e9b9a643fb53",
     "status": "awaiting_review",
     "check_status": "pass",
     "flags": [
@@ -75,15 +77,15 @@
     "step": 1,
     "expect": "the answer carries the caveat that the law may lack later amendments",
     "pass": true,
-    "question_id": "953735b990d3",
-    "status": "held",
-    "check_status": "held",
+    "question_id": "1931e4fee111",
+    "status": "awaiting_review",
+    "check_status": "pass_with_cuts",
     "flags": [],
     "cut_reasons": [
-      "numbers not in any cited source: 1, 4, 2007",
-      "numbers not in any cited source: 1, 4, 2007",
-      "numbers not in any cited source: 3, 2007",
-      "numbers not in any cited source: 1, 3, 2007"
+      "not written in the language of the question",
+      "not written in the language of the question",
+      "not written in the language of the question",
+      "not written in the language of the question"
     ],
     "audit": [
       "screened",
@@ -91,6 +93,7 @@
       "recalled",
       "retrieved",
       "drafted",
+      "declined",
       "verified",
       "queued"
     ]
@@ -101,7 +104,7 @@
     "step": 1,
     "expect": "the fixed refusal, with nothing retrieved",
     "pass": true,
-    "question_id": "a4e51c74fbee",
+    "question_id": "f32cf52135a7",
     "status": "awaiting_review",
     "check_status": "pass",
     "flags": [
@@ -122,12 +125,14 @@
     "step": 1,
     "expect": "the checker cuts the corrupted sentence and names the number",
     "pass": true,
-    "question_id": "adaf221a3eb9",
+    "question_id": "130f00a746c8",
     "status": "held",
     "check_status": "held",
     "flags": [],
     "cut_reasons": [
-      "numbers not in any cited source: 99"
+      "numbers not in any cited source: 99",
+      "quotes Law No. 33 of 2021 (Federal) without naming it, next to other sources",
+      "quotes Law No. 33 of 2021 (Federal) without naming it, next to other sources"
     ],
     "audit": [
       "screened",
@@ -145,7 +150,7 @@
     "step": 1,
     "expect": "the fixed request for detail, not a guessed answer",
     "pass": true,
-    "question_id": "46b4abf75859",
+    "question_id": "0bff4c3ce92f",
     "status": "awaiting_review",
     "check_status": "pass",
     "flags": [
@@ -166,11 +171,13 @@
     "step": 2,
     "expect": "the answer cites the residence visa provisions",
     "pass": true,
-    "question_id": "239484899826",
+    "question_id": "10957b62ad64",
     "status": "awaiting_review",
-    "check_status": "pass",
+    "check_status": "pass_with_cuts",
     "flags": [],
-    "cut_reasons": [],
+    "cut_reasons": [
+      "it has words in another language that neither its sources nor its English version have: family, member, sponsoring"
+    ],
     "audit": [
       "screened",
       "translated",
@@ -187,12 +194,11 @@
     "step": 1,
     "expect": "an answer with cited passages goes to review, and the reviewer rejects it",
     "pass": true,
-    "question_id": "ea4e3a1398bf",
+    "question_id": "f9deb139485e",
     "status": "awaiting_review",
     "check_status": "pass_with_cuts",
     "flags": [],
     "cut_reasons": [
-      "it negates where its English version does not, or the other way round",
       "quotes Law No. 33 of 2021 (Federal) without naming it, next to other sources"
     ],
     "audit": [
@@ -211,13 +217,12 @@
     "step": 2,
     "expect": "a new answer goes out, and it cites none of the passages the rejected answer cited",
     "pass": true,
-    "question_id": "249494137f25",
+    "question_id": "fb75c63a188b",
     "status": "awaiting_review",
     "check_status": "pass_with_cuts",
     "flags": [],
     "cut_reasons": [
-      "it does not say what its English version says (similarity 0.59, needs 0.60)",
-      "it has words in another language that neither its sources nor its English version have: acordo"
+      "quotes Law No. 33 of 2021 (Federal) without naming it, next to other sources"
     ],
     "audit": [
       "screened",
