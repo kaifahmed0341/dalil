@@ -70,6 +70,15 @@ FIXED_UNCITED = lang.all_fixed({
 # question about a law's reach needs, and how many scope passages are added.
 SCOPE_FROM = 8
 SCOPE_ADD = 3
+_COUNT = re.compile(r"\bhow\s+(?:many|much)\b|\bnumber\s+of\b|\bhow\s+often\b|\bcount\b|\btotal\b"
+                    r"|كم\s+(?:عدد|عددا|مرة)|^\s*كم\s+\S+|عدد\s", re.IGNORECASE)
+
+
+def asks_for_a_count(question: str) -> bool:
+    """Whether the question asks how many or how much, which open data answers."""
+    return bool(_COUNT.search(question))
+
+
 # How high a named subject's own page must rank for the search to keep to it.
 SUBJECT_RANK = 3
 _PLACEHOLDER = re.compile(r"\[[A-Z][A-Z ]+\]")
@@ -395,7 +404,10 @@ class Pipeline:
                 "k": self.k, "hits": len(hits),
                 "top": [{"passage_id": h.passage_id, "score": round(h.score, 3)} for h in hits[:3]],
             })
-            rules = match_rules(q, self.rules)
+            # Open data answers how many or how much. A question that only
+            # mentions a subject a rule covers, such as "Can I get my Emirates
+            # ID within 24 hours?", gets no yearly count it did not ask for.
+            rules = match_rules(q, self.rules) if asks_for_a_count(q) else []
             if rules:
                 client, why = self.data_source()
                 run = (lambda sql: client.sql(sql, limit=200).dicts()) if client else None

@@ -42,11 +42,15 @@ QUESTIONS = ROOT / "eval" / "citations.jsonl"
 
 def score(record, expected: set[str]) -> dict:
     kept = [s for s in record.check.get("sentences", []) if s["kept"] and s["kind"] == "claim"]
+    # A claim backed only by an open-data query cites no document; it is
+    # counted apart, not as a wrong source.
+    data_only = [s for s in kept if not any(c.get("doc_id") for c in s["citations"])]
+    kept = [s for s in kept if s not in data_only]
     cited = [sorted({c["doc_id"] for c in s["citations"] if c.get("doc_id")}) for s in kept]
     right = [bool(docs) and set(docs) <= expected for docs in cited]
     return {
         "status": record.status, "check": record.check.get("status"),
-        "kept": len(kept), "right": sum(right), "cited_docs": cited,
+        "kept": len(kept), "right": sum(right), "cited_docs": cited, "data_only": len(data_only),
         "found": any(set(d) & expected for d in cited), "clean": bool(kept) and all(right),
     }
 
@@ -65,6 +69,7 @@ def summarise(results: list[dict], questions: int, runs: int) -> dict:
         "found": sum(x["found"] for x in results),
         "clean": sum(x["clean"] for x in results),
         "claims_kept": kept, "claims_right": right,
+        "data_only_claims": sum(x.get("data_only", 0) for x in results),
         "claim_precision": round(right / kept, 3) if kept else None,
         "seconds_median": statistics.median(x["seconds"] for x in results) if results else None,
         "prompt_tokens_median": _median(x.get("prompt_tokens") for x in results),

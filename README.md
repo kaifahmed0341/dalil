@@ -62,12 +62,25 @@ Pages on government sites change. `fetch_corpus.py` reports a file whose hash no
 
 ### Swap it for another country or field
 
-Nothing in the code names a UAE document. To point Dalil at another country's services, or at another field such as a university's regulations:
+A knowledge base is a profile, `kb/<id>/profile.json`, and nothing in the code names a UAE document. The repository carries two: `kb/uae/`, the 53 UAE documents above, and `kb/uk/`, seven GOV.UK guides (National Insurance numbers, passports, notice, holiday, sick pay, redundancy) built with the same steps into 92 passages. GOV.UK text is under the Open Government Licence v3.0, so the UK passages are committed; the UAE ones are not.
 
-1. Write a new `data/MANIFEST.csv` with the same columns, and run the rebuild steps.
-2. Laws are recognised from their titles ("Law No. (7) of 2020", "مرسوم بقانون اتحادي رقم 45 لسنة 2021"), and services from their page titles, so the scope article and subject rules work on the new documents unchanged.
-3. Change the screener's ID formats in `dalil/safety.py` if the country's differ, and the fixed caveats in `dalil/lang.py` if their wording should.
-4. Run `scripts/run_itu_scenarios.py` and write new questions into `eval/citations.jsonl` to measure it.
+On the reviewer screen, the "Knowledge base" menu switches between them in a few milliseconds, with no restart: the header, the ask box, the review queue and the screener change with it. `DALIL_KB=uk` picks one at start.
+
+A profile names:
+- its manifest, extracted documents, built passages, its own store and the folder of original files;
+- its open data (a folder for the local database) or none;
+- whether it uses the review memory;
+- the words for the ask box, and the audience the writer is told it answers;
+- its screener: the ID formats removed from questions, and the fixed refusal and caveat sentences in its own wording.
+
+To add a base for another country or field, such as a university's regulations:
+
+1. Make `kb/<id>/`, with a `MANIFEST.csv` in the columns above and a `profile.json` modelled on `kb/uk/profile.json`.
+2. Build it: `scripts/fetch_corpus.py`, `scripts/extract_corpus.py` and `scripts/build_passages.py`, each with `--manifest kb/<id>/MANIFEST.csv` and its folders, as `kb/uk/README.md` shows.
+3. Laws are recognised from their titles ("Law No. (7) of 2020", "مرسوم بقانون اتحادي رقم 45 لسنة 2021") and services from their page titles, so the scope-article and subject rules work on the new documents unchanged.
+4. Write its scenarios as data, like `kb/uk/scenarios.json`, and run `scripts/run_scenarios.py kb/<id>/scenarios.json --kb <id>`.
+
+A profile is checked when it loads: its paths stay inside the repository, its ID patterns compile, and its fixed sentences hold no numbers.
 
 ## Policies covered
 

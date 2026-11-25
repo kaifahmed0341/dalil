@@ -208,7 +208,7 @@ def local_pipeline(tmp_path, local):
 
 def test_pipeline_answers_from_the_local_database_and_the_checker_reruns_it(tmp_path, local):
     p = local_pipeline(tmp_path, local)
-    rec = p.answer("How early can I renew my Emirates ID card?")
+    rec = p.answer("How many Emirates ID cards are renewed in a year, and how early can I renew mine?")
     data = [s for s in rec.check["sentences"] if any("sql" in c for c in s["citations"])]
     assert len(data) == 1 and data[0]["kept"]
     assert data[0]["text"] == "In 2025, ICP renewed 5856085 Emirates ID cards, according to its open data."
@@ -235,7 +235,7 @@ def test_health_and_citations_name_the_local_database(tmp_path, local):
     assert health["zetaris"] is False
     assert health["data_source"]["connected"] and health["data_source"]["kind"] == "local"
     assert health["data_source"]["label"] == "Open data: local database"
-    qid = tc.post("/api/questions", json={"question": "How early can I renew my Emirates ID card?"}).json()["id"]
+    qid = tc.post("/api/questions", json={"question": "How many Emirates ID cards are renewed in a year, and how early can I renew mine?"}).json()["id"]
     d = tc.get(f"/api/questions/{qid}").json()
     cits = [c for s in d["check"]["sentences"] for c in s["citations"] if c.get("sql")]
     assert cits and all(c["source_label"] == "queried from the local database" for c in cits)
@@ -336,7 +336,8 @@ def test_data_the_model_left_alone_is_not_added(tmp_path, local):
          "kind": "claim", "citations": [QUOTE]},
     ])
     rec = p.answer("Where do labour complaints to MOHRE go? I want to renew my card.")
-    assert rec.data and rec.data[0]["rows"]
+    # The question asks for no count, so no lookup runs and no data sentence is added.
+    assert not rec.data
     assert not any(any(c.get("sql") for c in s["citations"]) for s in rec.check["sentences"])
 
 

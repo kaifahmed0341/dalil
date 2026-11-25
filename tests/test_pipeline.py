@@ -100,7 +100,7 @@ def test_rules_are_fixed_safe_selects():
 
 def test_answer_runs_every_step_and_queues(store, passages):
     z = FakeZetaris()
-    rec = make(store, passages, zetaris=z).answer("How early can I renew my Emirates ID card?")
+    rec = make(store, passages, zetaris=z).answer("How many Emirates ID cards are renewed in a year, and how early can I renew mine?")
     assert rec.status == "awaiting_review"
     assert rec.check["status"] == "pass"
     assert any(s["text"].startswith("In 2025, ICP renewed 4242") and s["kept"] for s in rec.check["sentences"])
@@ -112,7 +112,7 @@ def test_answer_runs_every_step_and_queues(store, passages):
 
 
 def test_zetaris_down_skips_lookup_with_a_note(store, passages):
-    rec = make(store, passages, zetaris=FakeZetaris(fail=True)).answer("How do I renew my Emirates ID?")
+    rec = make(store, passages, zetaris=FakeZetaris(fail=True)).answer("How many Emirates ID cards are renewed each year?")
     assert rec.status == "awaiting_review"
     assert rec.data and rec.data[0]["rows"] == [] and "unreachable" in rec.data[0]["note"]
     assert not any("sql" in c for s in rec.draft for c in s["citations"])

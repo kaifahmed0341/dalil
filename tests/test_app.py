@@ -52,7 +52,7 @@ def test_post_and_list(client):
 
 
 def test_detail_shape(client):
-    qid = ask(client)["id"]
+    qid = ask(client, "How many Emirates ID cards are renewed in a year, and how early can I renew mine?")["id"]
     d = client.get(f"/api/questions/{qid}").json()
     assert set(d) == {"id", "question", "flags", "status", "created_at", "retrieval", "data", "check", "review", "audit",
                       "knowledge_base"}

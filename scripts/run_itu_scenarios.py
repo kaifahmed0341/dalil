@@ -136,9 +136,17 @@ def scenarios(language: str = "en") -> list[tuple[str, str, list[Step]]]:
     personal, refuse, ask = (lang.fixed(t, language) for t in (
         safety.PERSONAL_DATA_CAVEAT, safety.REFUSAL_TEXT, safety.ASK_FOR_DETAIL))
 
-    def said(check):
-        """The step's own check, and every sentence that goes out is in the question's language."""
-        return lambda r, ctx, row: bool(check(r, ctx, row)) and in_language(r, language)
+    def said(check, may_hold=False):
+        """The step's own check, and every sentence that goes out is in the question's language.
+        `may_hold`: the step passes with nothing going out, as S5 does when the
+        model wrote a single claim and the corrupted one was cut."""
+        def run(r, ctx, row):
+            if not check(r, ctx, row):
+                return False
+            if may_hold and not any(s["kept"] for s in r.check.get("sentences", [])):
+                return True
+            return in_language(r, language)
+        return run
 
     def no_price(r, ctx, row):
         text = kept_text(r)
@@ -176,7 +184,7 @@ def scenarios(language: str = "en") -> list[tuple[str, str, list[Step]]]:
         ("S5", "A drafted sentence with a number its source does not have", [
             Step(q["S5"], "the checker cuts the corrupted sentence and names the number",
                  said(lambda r, ctx, row: any(not s["kept"] and any("99" in reason for reason in s["reasons"])
-                                              for s in claims(r))), tamper=True),
+                                              for s in claims(r)), may_hold=True), tamper=True),
         ]),
         ("S6", "A vague question, then the same question with the detail", [
             Step(q["S6.1"], "the fixed request for detail, not a guessed answer",

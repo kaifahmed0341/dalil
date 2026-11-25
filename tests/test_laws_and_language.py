@@ -810,3 +810,15 @@ def test_a_restated_data_sentence_is_marked_in_the_check(tmp_path):
                  zetaris_factory=None)
     rec = p.answer("Can I see the personal records kept about me?")
     assert rec.check["sentences"][0].get("restated") is True
+
+
+@pytest.mark.parametrize("question, count", [
+    ("How many Emirates ID cards are renewed each year?", True),
+    ("كم عدد مراكز الخدمة في الدولة؟", True),
+    ("What is the number of service centres?", True),
+    ("Can I get my Emirates ID card within 24 hours?", False),
+    ("How do I file a labour complaint against my employer?", False),
+])
+def test_open_data_answers_only_count_questions(question, count):
+    from dalil.pipeline import asks_for_a_count
+    assert asks_for_a_count(question) is count
