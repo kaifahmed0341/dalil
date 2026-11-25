@@ -388,3 +388,17 @@ def test_states_value_reads_arabic_indic_digits():
     rec = Record("x", "q", [], "awaiting_review", check={"sentences": [
         {"text": "يوجد ٤٩ مركز تسهيل.", "kind": "claim", "kept": True, "citations": [cit]}]})
     assert sc.CHECKS["states_value"](rec, {}, {"table": "dalil.t", "column": "n", "value": "49"})
+
+
+def test_a_data_citation_on_a_sentence_that_does_not_state_it_is_dropped_and_the_value_restated(tmp_path, local):
+    rule = RULES[0]
+    p = scripted(tmp_path, local, [
+        {"text": "Renewal requests are made through the service centres or the official website of the authority.",
+         "kind": "claim", "citations": [QUOTE, {"table": rule.table, "sql": rule.sql, "column": "transactions",
+                                                "value": "5856085"}]},
+    ])
+    rec = p.answer("How many Emirates ID cards does ICP renew in a year?")
+    first = rec.check["sentences"][0]
+    assert first["kept"] and not any(c.get("sql") for c in first["citations"])
+    kept = [s["text"] for s in rec.check["sentences"] if s["kept"]]
+    assert "ICP open data counts 5856085 Emirates ID card renewals in 2025." in kept

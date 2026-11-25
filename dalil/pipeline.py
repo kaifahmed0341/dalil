@@ -15,7 +15,7 @@ import sys
 
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, Mapping
 
 from dalil import lang, safety
 from dalil.draft import (FEE_CAVEAT, LAW_CAVEAT, WEAK_REFUSAL, Drafter, ExtractiveDrafter, caveat, data_claims,
@@ -314,10 +314,29 @@ def _numbers(text: str) -> set[str]:
     return numbers(text)
 
 
+def _states(sentence: Mapping[str, Any], citation: Mapping[str, Any]) -> bool:
+    """True when the sentence's text holds the data citation's value."""
+    value = _numbers(str(citation.get("value") or ""))
+    return bool(value) and value <= _numbers(sentence.get("text", ""))
+
+
+def _drop_unstated_data(sentence: dict[str, Any]) -> dict[str, Any]:
+    cits = sentence.get("citations") or []
+    keep = [c for c in cits if "sql" not in c or _states(sentence, c)]
+    if len(keep) == len(cits) or sentence.get("kind", "claim") != "claim":
+        return sentence
+    return {**sentence, "citations": keep, "unstated_data_dropped": len(cits) - len(keep)}
+
+
 def restate_data(draft: list[dict[str, Any]], check: dict[str, Any], data: list[DataResult],
                  language: str = "en") -> list[dict[str, Any]] | None:
-    """A new draft when the model tried to state an open-data result but the
-    checker cut every sentence that carried it; else None.
+    """A new draft when the model tried to state an open-data result but no
+    kept sentence states it; else None.
+
+    A sentence carries a lookup only when it cites the query and states the
+    cited value. A data citation on a sentence that does not state its value
+    backs nothing, so it is taken off that sentence; the sentence still has to
+    pass on its other citations.
 
     "Tried" means a drafted claim cites the lookup's query or writes one of the
     values in its row other than the year. The rule's own fixed sentence (dalil/opendata.py) then
@@ -326,12 +345,14 @@ def restate_data(draft: list[dict[str, Any]], check: dict[str, Any], data: list[
     the model left alone is left out: it judged the data off the question.
     """
     sentences = check.get("sentences", [])
-    out = list(draft)
+    out = [_drop_unstated_data(s) for s in draft]
+    changed = out != draft
     extra = []
     for res in data:
         if not res.rows or not res.fact:
             continue
-        carried = any(s["kept"] and any(c.get("ok") and c.get("sql") == res.sql for c in s.get("citations", []))
+        carried = any(s["kept"] and any(c.get("ok") and c.get("sql") == res.sql and _states(s, c)
+                                        for c in s.get("citations", []))
                       for s in sentences)
         if carried:
             continue
@@ -346,7 +367,7 @@ def restate_data(draft: list[dict[str, Any]], check: dict[str, Any], data: list[
                               else res.fact)
             extra += [{**claim, "restated": True} for claim in data_claims([said])]
     if not extra:
-        return None
+        return out if changed else None
     # After the model's claims, before the fixed caveats and refusals.
     at = max((i + 1 for i, s in enumerate(out) if s.get("kind", "claim") == "claim"), default=0)
     return out[:at] + extra + out[at:]
