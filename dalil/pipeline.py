@@ -508,6 +508,15 @@ class Pipeline:
                                                     "cut_first": [s["reasons"] for s in check["sentences"]
                                                                   if not s["kept"]]})
                 draft, check = redraft, second
+        if self.redraft and self._all_claims_cut(check) \
+                and not any(s["kept"] and s["kind"] == "refusal" for s in check["sentences"]):
+            # Every claim was cut and no quote-only redraft could stand in.
+            # The resident gets Dalil's fixed refusal rather than nothing, and
+            # the reviewer still sees every cut sentence and why.
+            draft = [*draft, refusal(lang.fixed(WEAK_REFUSAL, question_lang))]
+            check = verifier.check_answer(draft).to_dict()
+            self.store.event(qid, "declined", {"reason": "the checker cut every claim the writer drafted",
+                                               "cut": sum(1 for s in check["sentences"] if not s["kept"])})
         # The checked sentences follow the draft's order; carry the mark of a
         # sentence Dalil's data rule stated, so the screen can show it.
         for checked, drafted in zip(check["sentences"], draft):

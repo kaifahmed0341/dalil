@@ -159,7 +159,7 @@ def numbers(text: str) -> set[str]:
 
 _LAW_NUMBER = re.compile(
     r"\b(?:No\.?|Number|Law|Decree)\s*\(?(\d+)\)?|\b(?:of|in)\s+((?:19|20)\d\d)\b"
-    r"|رقم\s*\(?\s*(\d+)\s*\)?|لسنة\s*((?:19|20)\d\d)", re.IGNORECASE)
+    r"|رقم\s*\(?\s*(\d+)\s*\)?|(?:لسنة|لعام|عام|سنة)\s*\(?\s*((?:19|20)\d\d)", re.IGNORECASE)
 
 
 def law_numbers(text: str) -> set[str]:
@@ -238,6 +238,8 @@ _ATTRIBUTION = re.compile(
     r"^\s*(?:(?:according\s+to|under|as\s+per|per)\b[^,]{0,120},|(?:وفق[اًا]*|طبق[اًا]*|بموجب|حسب)\s[^،,]{0,120}[،,])\s*",
     re.IGNORECASE)
 _LATIN_WORD = re.compile(r"[A-Za-z][A-Za-z'-]+")
+# Scripts no answer here is written in: Cyrillic, Greek, CJK, Hangul.
+_FOREIGN_SCRIPT = re.compile("[\u0370-\u03ff\u0400-\u04ff\u3040-\u30ff\u4e00-\u9fff\uac00-\ud7af]")
 
 
 def _without_idioms(text: str) -> str:
@@ -307,6 +309,10 @@ def unit_mismatches(claim: str, evidence: str) -> list[str]:
             problems.append(f"gives {n} in {'/'.join(sorted(units))}s where its sources give "
                             f"{'/'.join(sorted(have[n]))}s")
     return problems
+
+
+# Words for the person who holds or asks, not for what is asked about.
+_ROLE_WORDS = frozenset({"holder", "owner", "applic", "resid", "person", "peopl", "individu"})
 
 
 def _script(text: str) -> str:
@@ -541,6 +547,11 @@ class Verifier:
             result.kept = False
             result.reasons.append("not written in the language of the question")
             return result
+        if _FOREIGN_SCRIPT.search(text):
+            result.kept = False
+            result.reasons.append("has words in a script that is neither the answer's nor its sources': "
+                                  + "".join(sorted(set(_FOREIGN_SCRIPT.findall(text))))[:20])
+            return result
         for cit in citations:
             check = self.check_data(cit) if "sql" in cit or "table" in cit else self.check_quote(cit)
             result.citations.append(check)
@@ -613,6 +624,10 @@ class Verifier:
                         result.kept = False
                         result.reasons.append("no one source says what the claim answers; missing from every "
                                               "single document: " + ", ".join(missing))
+                    elif (absent := self.asked_but_absent(text, evidence)):
+                        result.kept = False
+                        result.reasons.append("names what the question asks about but its sources do not say: "
+                                              + ", ".join(absent))
             # Negations count as one class: "cannot" is backed by a source's "will not".
             # "No." in "Law No. 45" is a law reference, not a negation.
             added = sorted(_negations(_words(_without_idioms(_LAW_NUMBER.sub(" ", text)))))
@@ -682,9 +697,27 @@ class Verifier:
             if gaps:
                 problems.append("no one source says what the claim answers; missing from every single document: "
                                 + ", ".join(gaps))
+            elif (absent := self.asked_but_absent(en, evidence)):
+                problems.append("its English version names what the question asks about but its sources do not "
+                                "say: " + ", ".join(absent))
         if problems:
             result.kept = False
             result.reasons.extend(problems)
+
+    def asked_but_absent(self, claim: str, evidence: str) -> list[str]:
+        """The claim's words that repeat the question and that its sources do
+        not carry, such as "parents" in "Golden visa holders can sponsor their
+        parents" over "the ability to sponsor family members, including
+        spouses and children". A claim answers with what its sources say;
+        echoing the asked word over a source that never says it is the
+        commonest way a small model states the answer the resident hoped for.
+        Words that only say what kind of answer is wanted ("need", "can",
+        "how long") do not count."""
+        from dalil.retrieve import tokenize
+        from dalil.safety import subject_generic
+        asked = ({t for t in tokenize(claim) if not t.isdigit()} & set(tokenize(self.question))) \
+            - subject_generic() - _ROLE_WORDS
+        return sorted(asked - set(tokenize(evidence)))
 
     def stitched(self, claim: str, citations: list[CitationCheck]) -> list[str]:
         """The claim's words that repeat the question and that no single cited
@@ -792,7 +825,9 @@ class Verifier:
         elif not claims:
             status = "pass" if cut_other == 0 else "held"
         elif cut_claims == len(claims):
-            status = "held"
+            # Every claim was cut. With Dalil's fixed refusal kept, the
+            # refusal is the answer and the cuts are shown to the reviewer.
+            status = "pass_with_cuts" if any(s.kept and s.kind == "refusal" for s in checks) else "held"
         elif cut_claims == 0 and cut_other == 0:
             status = "pass"
         elif cut_claims / len(claims) <= MAX_CUT_SHARE:

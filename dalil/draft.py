@@ -633,8 +633,14 @@ class LLMDrafter:
         if self.api_key:
             headers["authorization"] = f"Bearer {self.api_key}"
         req = Request(f"{self.url}/chat/completions", data=json.dumps(body).encode("utf-8"), headers=headers)
-        with urlopen(req, timeout=timeout or self.timeout) as r:
-            out = json.loads(r.read().decode("utf-8"))
+        limit = timeout or self.timeout
+        try:
+            with urlopen(req, timeout=limit) as r:
+                out = json.loads(r.read().decode("utf-8"))
+        except (TimeoutError, OSError) as e:
+            if isinstance(e, TimeoutError) or "timed out" in str(e):
+                raise TimeoutError(f"the model did not answer within {limit:.0f} s") from e
+            raise
         self.last_usage = {**(out.get("usage") or {}), **(out.get("timings") or {})}
         return out["choices"][0]["message"]["content"] or ""
 
@@ -737,5 +743,8 @@ class FallbackDrafter:
             self._local.used, self._local.error = type(self.primary).__name__, ""
             return out
         except Exception as e:  # network, timeout, bad JSON twice: fall back, and say so
-            self._local.used, self._local.error = type(self.fallback).__name__, type(e).__name__
+            # The reason goes into the audit trail: its kind, and its message,
+            # which for a timeout names the time limit.
+            self._local.used = type(self.fallback).__name__
+            self._local.error = f"{type(e).__name__}: {e}"[:200] if str(e) else type(e).__name__
             return self.fallback.draft(question, hits, data, notes=notes)

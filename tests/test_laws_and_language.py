@@ -887,3 +887,66 @@ def test_longer_arabic_bounds_and_english_words_inside_arabic():
     name = v.check_sentence({"text": "يمكن للعامل تحديد يوم الغياب بشرط أن يبلغ صاحب العمل قبل 3 أيام، وتقدم الطلبات إلى MoHRE.",
                              "text_en": en + " Requests go to MoHRE.", "citations": [quote]})
     assert name.kept, name.reasons
+
+
+# --- rehearsal faults --------------------------------------------------------------------
+
+
+GOLD = passage("sample-gold-card:p1:3", "Benefits of the Gold card: the ability to sponsor family members, "
+               "including spouses and children.", page=1, kind="html")
+
+
+@pytest.mark.parametrize("claim, kept", [
+    ("Gold card holders can sponsor their parents.", False),
+    ("Gold card holders can sponsor their brothers and sisters.", False),
+    ("Gold card holders can sponsor family members, including spouses and children.", True),
+])
+def test_a_claim_may_not_name_what_its_sources_do_not_carry(claim, kept):
+    v = Verifier({GOLD["passage_id"]: GOLD}, titles={"sample-gold-card": "Gold card"},
+                 question="Can a Gold card holder sponsor their parents, brothers and sisters?")
+    check = v.check_sentence({"text": claim, "citations": [{"passage_id": GOLD["passage_id"],
+                                                            "quote": "the ability to sponsor family members, including spouses and children."}]})
+    assert check.kept is kept, check.reasons
+
+
+def test_arabic_year_in_a_law_name_is_backed_by_the_title():
+    p = passage("sample-rent-law:p4:1", "Landlord and Tenant must specify the Rent in the Lease Contract.", kind="pdf")
+    v = Verifier({p["passage_id"]: p}, titles={"sample-rent-law": "Law No. (26) of 2007 Regulating Rent"},
+                 similarity=lambda c, w: [0.9 for _ in w])
+    check = v.check_sentence({"text": "بموجب القانون رقم (26) من عام 2007، يجب تحديد الإيجار في عقد الإيجار.",
+                              "text_en": "Under Law No. (26) of 2007, the Rent must be specified in the Lease Contract.",
+                              "citations": [{"passage_id": p["passage_id"], "quote": p["text"]}]})
+    assert check.kept, check.reasons
+
+
+def test_a_foreign_script_is_cut():
+    q = {"passage_id": PORTAL["passage_id"], "quote": PORTAL_QUOTE}
+    check = Verifier(PASSAGES).check_sentence({"text": "The records law должен give residents a right.", "citations": [q]})
+    assert not check.kept and "script" in check.reasons[0]
+
+
+def test_when_every_claim_is_cut_the_resident_gets_the_refusal(tmp_path):
+    class Wrong:
+        def draft(self, question, hits, data, notes=(), english=""):
+            return [{"text": "يحق للسكان الاطلاع على سجلاتهم.", "text_en": "Residents may see everything.",
+                     "kind": "claim", "citations": [cite(PORTAL, PORTAL_QUOTE)]}]
+
+    p = Pipeline(Store(tmp_path / "d.db"), FakeRetriever([as_hit(PORTAL, 20.0)]), PASSAGES, drafter=Wrong(),
+                 zetaris_factory=None)
+    rec = p.answer("هل يمكنني الاطلاع على سجلاتي؟")
+    kinds = [(s["kind"], s["kept"]) for s in rec.check["sentences"]]
+    assert ("claim", False) in kinds and ("refusal", True) in kinds
+    assert rec.status == "awaiting_review"
+    assert "declined" in [e["kind"] for e in p.store.get(rec.id)["audit"]]
+
+
+def test_a_timeout_is_recorded_with_its_limit():
+    from dalil.draft import ExtractiveDrafter, FallbackDrafter
+
+    class Slow:
+        def draft(self, question, hits, data, notes=(), english=""):
+            raise TimeoutError("the model did not answer within 180 s")
+
+    d = FallbackDrafter(Slow(), ExtractiveDrafter())
+    d.draft("Can I see my records?", [as_hit(PORTAL, 20.0)], [])
+    assert d.last_error == "TimeoutError: the model did not answer within 180 s"

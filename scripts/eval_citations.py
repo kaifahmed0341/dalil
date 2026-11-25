@@ -40,17 +40,23 @@ from dalil.store import Store  # noqa: E402
 QUESTIONS = ROOT / "eval" / "citations.jsonl"
 
 
-def score(record, expected: set[str]) -> dict:
+def score(record, expected: set[str], must_not_say: list[str] = ()) -> dict:
     kept = [s for s in record.check.get("sentences", []) if s["kept"] and s["kind"] == "claim"]
     # A claim backed only by an open-data query cites no document; it is
     # counted apart, not as a wrong source.
     data_only = [s for s in kept if not any(c.get("doc_id") for c in s["citations"])]
+    from dalil.retrieve import tokenize
+    # A kept claim that says a word the question's sources never support,
+    # such as "parents" for a Golden visa, is wrong whatever page it cites.
+    forbidden = set(tokenize(" ".join(must_not_say)))
+    said_wrong = [s for s in kept if set(tokenize(s["text"])) & forbidden]
     kept = [s for s in kept if s not in data_only]
     cited = [sorted({c["doc_id"] for c in s["citations"] if c.get("doc_id")}) for s in kept]
-    right = [bool(docs) and set(docs) <= expected for docs in cited]
+    right = [bool(docs) and set(docs) <= expected and s not in said_wrong for s, docs in zip(kept, cited)]
     return {
         "status": record.status, "check": record.check.get("status"),
         "kept": len(kept), "right": sum(right), "cited_docs": cited, "data_only": len(data_only),
+        "said_what_sources_do_not": len(said_wrong),
         "found": any(set(d) & expected for d in cited), "clean": bool(kept) and all(right),
     }
 
@@ -122,7 +128,8 @@ def main() -> int:
                    # The model server's own counts for this answer's draft, when it drafted.
                    "prompt_tokens": usage.get("prompt_n"), "output_tokens": usage.get("predicted_n"),
                    "prompt_ms": usage.get("prompt_ms"), "output_ms": usage.get("predicted_ms"),
-                   **score(rec, set(r["expected_docs"]))}
+                   "fallback_reason": getattr(drafter, "last_error", "") or "",
+                   **score(rec, set(r["expected_docs"]), r.get("must_not_say", []))}
             if getattr(drafter, "primary", None) is not None:
                 drafter.primary.last_usage = {}
             results.append(res)

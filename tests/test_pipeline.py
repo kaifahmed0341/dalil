@@ -180,11 +180,15 @@ def test_when_every_claim_is_cut_the_sources_are_quoted_instead(store, passages)
 
 
 def test_no_redraft_when_the_quotes_fail_too(store, passages):
-    # Weak retrieval: the extractive drafter can only refuse, so the bad draft stays held.
+    # Weak retrieval: the extractive drafter can only refuse, so no redraft
+    # stands in; the resident gets the fixed refusal, and the cut claim stays
+    # in the record for the reviewer.
     rec = make(store, passages, hits=[hit(PASSAGES[0], 2.0)], drafter=Fabricator()).answer(
         "What does renewing the resident card cost?")
-    assert rec.status == "held"
-    assert "redrafted" not in [e["kind"] for e in store.get(rec.id)["audit"]]
+    events = [e["kind"] for e in store.get(rec.id)["audit"]]
+    assert "redrafted" not in events and "declined" in events
+    assert [s["kind"] for s in rec.check["sentences"] if s["kept"]] == ["refusal"]
+    assert any(not s["kept"] and s["kind"] == "claim" for s in rec.check["sentences"])
 
 
 def test_wrong_number_is_cut(store, passages):
