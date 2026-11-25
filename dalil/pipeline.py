@@ -64,6 +64,10 @@ FIXED_UNCITED = lang.all_fixed({
 # question about a law's reach needs, and how many scope passages are added.
 SCOPE_FROM = 8
 SCOPE_ADD = 3
+# Past reviews whose questions are translated for matching, per request, and
+# how many translations are kept across requests.
+MEMORY_TRANSLATIONS = 5
+ENGLISH_CACHE_MAX = 2000
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_PASSAGES = REPO_ROOT / "build" / "passages.jsonl"
@@ -168,7 +172,7 @@ class Pipeline:
             out = datasource.status(source)
         return out
 
-    def recall(self, qid: str, question: str) -> Guidance:
+    def recall(self, qid: str, question: str, english: str = "") -> Guidance:
         """Reviews of similar questions, from the review memory, and log what was used."""
         if self.memory is None:
             return Guidance()
@@ -176,12 +180,47 @@ class Pipeline:
         if recalled is None:
             self.store.event(qid, "recalled", {"available": False})
             return Guidance()
-        g = guidance(question, recalled.get("memories") or [])
+        g = guidance(question, recalled.get("memories") or [], english=self._to_english(question, english))
         self.store.event(qid, "recalled", {
             "available": True, "similar_reviews": g.similar,
             "passages_left_out": sorted(g.avoid), "notes": len(g.notes),
         })
         return g
+
+    def _to_english(self, question: str, english: str) -> Callable[[str], str] | None:
+        """English for the review memory's question matching: this question's
+        translation, English text unchanged, others translated once and cached."""
+        translate = self.translator()
+        if translate is None:
+            return None
+        cache: dict[str, str] = getattr(self, "_english_cache", {})
+        if len(cache) > ENGLISH_CACHE_MAX:
+            cache = {}
+        self._english_cache = cache
+        failed: set[str] = set()  # this request only: a later request tries again
+        if english:
+            cache[question] = english
+
+        budget = [MEMORY_TRANSLATIONS]
+
+        def to_english(text: str) -> str:
+            """English for `text`, or "" when it cannot be had. A failure is
+            cached too, and each request translates at most a few memories,
+            so a slow model cannot hold a request for long."""
+            if lang.language(text) == lang.ENGLISH:
+                return text
+            if text in cache:
+                return cache[text]
+            if text in failed or budget[0] <= 0:
+                return ""
+            budget[0] -= 1
+            try:
+                cache[text] = translate(text)
+            except Exception:
+                failed.add(text)
+                return ""
+            return cache[text]
+        return to_english
 
     def translator(self) -> Callable[[str], str] | None:
         """The model's translate(), when the drafter has a model."""
@@ -294,8 +333,8 @@ class Pipeline:
             if screened.has_personal_data:
                 draft.append(caveat(safety.PERSONAL_DATA_CAVEAT))
         else:
-            past = self.recall(qid, q)
             english = self.english_query(qid, q)
+            past = self.recall(qid, q, english)
             hits = self.search(q, past.avoid, english)
             self.store.event(qid, "retrieved", {
                 "k": self.k, "hits": len(hits),
@@ -315,7 +354,7 @@ class Pipeline:
                     "rows": [len(d.rows) for d in data],
                     "notes": [d.note for d in data if d.note],
                 })
-            draft = self.drafter.draft(q, hits, data, notes=past.notes)
+            draft = self.drafter.draft(q, hits, data, notes=past.notes, **({"english": english} if english else {}))
             if screened.has_personal_data:
                 draft = [*draft, caveat(safety.PERSONAL_DATA_CAVEAT)]
         # Fixed refusals and caveats go out in the question's language.

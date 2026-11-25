@@ -1,0 +1,243 @@
+{
+ "summary": {
+  "questions": 1,
+  "runs": 10,
+  "answers": 10,
+  "answered": 10,
+  "found": 10,
+  "clean": 10,
+  "claims_kept": 28,
+  "claims_right": 28,
+  "claim_precision": 1.0,
+  "seconds_median": 6.2,
+  "drafters": [
+   "LLMDrafter"
+  ]
+ },
+ "results": [
+  {
+   "id": "c41",
+   "run": 1,
+   "seconds": 6.5,
+   "drafter": "LLMDrafter",
+   "status": "awaiting_review",
+   "check": "pass",
+   "kept": 3,
+   "right": 3,
+   "cited_docs": [
+    [
+     "uae-golden-visa"
+    ],
+    [
+     "uae-golden-visa"
+    ],
+    [
+     "uae-golden-visa"
+    ]
+   ],
+   "found": true,
+   "clean": true
+  },
+  {
+   "id": "c41",
+   "run": 2,
+   "seconds": 6.2,
+   "drafter": "LLMDrafter",
+   "status": "awaiting_review",
+   "check": "pass",
+   "kept": 3,
+   "right": 3,
+   "cited_docs": [
+    [
+     "uae-golden-visa"
+    ],
+    [
+     "uae-golden-visa"
+    ],
+    [
+     "uae-golden-visa"
+    ]
+   ],
+   "found": true,
+   "clean": true
+  },
+  {
+   "id": "c41",
+   "run": 3,
+   "seconds": 13.7,
+   "drafter": "LLMDrafter",
+   "status": "awaiting_review",
+   "check": "pass",
+   "kept": 4,
+   "right": 4,
+   "cited_docs": [
+    [
+     "uae-golden-visa"
+    ],
+    [
+     "uae-golden-visa"
+    ],
+    [
+     "uae-golden-visa"
+    ],
+    [
+     "uae-golden-visa"
+    ]
+   ],
+   "found": true,
+   "clean": true
+  },
+  {
+   "id": "c41",
+   "run": 4,
+   "seconds": 3.9,
+   "drafter": "LLMDrafter",
+   "status": "awaiting_review",
+   "check": "pass",
+   "kept": 1,
+   "right": 1,
+   "cited_docs": [
+    [
+     "uae-golden-visa"
+    ]
+   ],
+   "found": true,
+   "clean": true
+  },
+  {
+   "id": "c41",
+   "run": 5,
+   "seconds": 6.2,
+   "drafter": "LLMDrafter",
+   "status": "awaiting_review",
+   "check": "pass",
+   "kept": 3,
+   "right": 3,
+   "cited_docs": [
+    [
+     "uae-golden-visa"
+    ],
+    [
+     "uae-golden-visa"
+    ],
+    [
+     "uae-golden-visa"
+    ]
+   ],
+   "found": true,
+   "clean": true
+  },
+  {
+   "id": "c41",
+   "run": 6,
+   "seconds": 3.9,
+   "drafter": "LLMDrafter",
+   "status": "awaiting_review",
+   "check": "pass",
+   "kept": 1,
+   "right": 1,
+   "cited_docs": [
+    [
+     "uae-golden-visa"
+    ]
+   ],
+   "found": true,
+   "clean": true
+  },
+  {
+   "id": "c41",
+   "run": 7,
+   "seconds": 6.0,
+   "drafter": "LLMDrafter",
+   "status": "awaiting_review",
+   "check": "pass",
+   "kept": 3,
+   "right": 3,
+   "cited_docs": [
+    [
+     "uae-golden-visa"
+    ],
+    [
+     "uae-golden-visa"
+    ],
+    [
+     "uae-golden-visa"
+    ]
+   ],
+   "found": true,
+   "clean": true
+  },
+  {
+   "id": "c41",
+   "run": 8,
+   "seconds": 6.2,
+   "drafter": "LLMDrafter",
+   "status": "awaiting_review",
+   "check": "pass",
+   "kept": 3,
+   "right": 3,
+   "cited_docs": [
+    [
+     "uae-golden-visa"
+    ],
+    [
+     "uae-golden-visa"
+    ],
+    [
+     "uae-golden-visa"
+    ]
+   ],
+   "found": true,
+   "clean": true
+  },
+  {
+   "id": "c41",
+   "run": 9,
+   "seconds": 13.7,
+   "drafter": "LLMDrafter",
+   "status": "awaiting_review",
+   "check": "pass",
+   "kept": 4,
+   "right": 4,
+   "cited_docs": [
+    [
+     "uae-golden-visa"
+    ],
+    [
+     "uae-golden-visa"
+    ],
+    [
+     "uae-golden-visa"
+    ],
+    [
+     "uae-golden-visa"
+    ]
+   ],
+   "found": true,
+   "clean": true
+  },
+  {
+   "id": "c41",
+   "run": 10,
+   "seconds": 6.3,
+   "drafter": "LLMDrafter",
+   "status": "awaiting_review",
+   "check": "pass",
+   "kept": 3,
+   "right": 3,
+   "cited_docs": [
+    [
+     "uae-golden-visa"
+    ],
+    [
+     "uae-golden-visa"
+    ],
+    [
+     "uae-golden-visa"
+    ]
+   ],
+   "found": true,
+   "clean": true
+  }
+ ]
+}
