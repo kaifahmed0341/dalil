@@ -347,7 +347,8 @@ class Pipeline:
                             allowed_passages=[h.passage_id for h in hits], titles=self.titles, laws=self.laws,
                             similarity=getattr(self.retriever, "similarities", None), question=q,
                             subjects=subjects,
-                            data_facts={d.sql: " ".join(f for f in (d.fact, d.fact_ar) if f) for d in data if d.fact})
+                            data_facts={d.sql: " ".join(f for f in (d.fact, d.fact_ar, d.meaning) if f)
+                                        for d in data if d.fact})
         check = verifier.check_answer(draft).to_dict()
         added = restate_data(draft, check, data, question_lang)
         if added:

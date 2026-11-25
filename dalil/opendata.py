@@ -29,6 +29,10 @@ class DataRule:
     fact: str
     # The same sentence in Arabic, for a question asked in Arabic.
     fact_ar: str = ""
+    # What the value counts, in plain words, in both languages. The checker
+    # reads it with the fact as the meaning of a data citation, so a claim that
+    # says the same thing in other words is not cut for its wording.
+    meaning: str = ""
 
 
 @dataclass
@@ -41,15 +45,16 @@ class DataResult:
     # "local" or "zetaris": the source that ran the query. Empty when none did.
     source: str = ""
     fact_ar: str | None = None
+    meaning: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {"table": self.table, "sql": self.sql, "rows": self.rows, "note": self.note, "fact": self.fact,
-                "source": self.source, "fact_ar": self.fact_ar}
+                "source": self.source, "fact_ar": self.fact_ar, "meaning": self.meaning}
 
     @classmethod
     def from_dict(cls, d: Mapping[str, Any]) -> "DataResult":
         return cls(d["table"], d["sql"], list(d.get("rows") or []), d.get("note") or "", d.get("fact"),
-                   d.get("source") or "", d.get("fact_ar"))
+                   d.get("source") or "", d.get("fact_ar"), d.get("meaning"))
 
 
 RULES: tuple[DataRule, ...] = (
@@ -62,6 +67,9 @@ RULES: tuple[DataRule, ...] = (
         "ICP open data counts {transactions} Emirates ID card renewals in {year}.",
         "تسجل البيانات المفتوحة للهيئة الاتحادية للهوية والجنسية {transactions} عملية تجديد لبطاقة الهوية "
         "الإماراتية في عام {year}.",
+        "The number of Emirates ID cards the Federal Authority for Identity and Citizenship (ICP) renews in a "
+        "year. عدد بطاقات الهوية الإماراتية التي تجددها الهيئة الاتحادية للهوية والجنسية في السنة، أي عدد "
+        "عمليات تجديد الهوية.",
     ),
     DataRule(
         "residence_renewals", re.compile(r"\brenew(?:al|als|ing|ed)?\b|تجديد|يجدد|تجدد", re.I),
@@ -71,6 +79,8 @@ RULES: tuple[DataRule, ...] = (
         "ICP open data counts {transactions} residence permit renewals in {year}.",
         "تسجل البيانات المفتوحة للهيئة الاتحادية للهوية والجنسية {transactions} عملية تجديد لتصاريح الإقامة "
         "في عام {year}.",
+        "The number of residence permits (residence visas) ICP renews in a year. عدد تصاريح الإقامة وتأشيرات "
+        "الإقامة التي تجددها الهيئة الاتحادية للهوية والجنسية في السنة.",
     ),
     DataRule(
         "tasheel_centres", re.compile(r"\btasheel\b|تسهيل", re.I),
@@ -78,6 +88,9 @@ RULES: tuple[DataRule, ...] = (
         "SELECT COUNT(*) AS centres, COUNT(DISTINCT emirate_en) AS emirates FROM dalil.open_tasheel_centres",
         "MOHRE open data lists {centres} Tasheel service centres across {emirates} emirates.",
         "تُدرج البيانات المفتوحة لوزارة الموارد البشرية والتوطين {centres} مركز خدمة تسهيل في {emirates} إمارات.",
+        "The number of Tasheel service centres of the Ministry of Human Resources and Emiratisation (MOHRE) in "
+        "the UAE, and the number of emirates they are spread across. عدد مراكز خدمة تسهيل التابعة لوزارة "
+        "الموارد البشرية والتوطين في دولة الإمارات، والمراكز موزعة على عدد من الإمارات.",
     ),
     DataRule(
         "medical_fitness",
@@ -87,6 +100,8 @@ RULES: tuple[DataRule, ...] = (
         "FROM dalil.open_ehs_medical_fitness GROUP BY year ORDER BY year DESC LIMIT 1",
         "Emirates Health Services open data counts {exams} residency medical fitness exams in {year}.",
         "تسجل البيانات المفتوحة لمؤسسة الإمارات للخدمات الصحية {exams} فحص لياقة طبية للإقامة في عام {year}.",
+        "The number of medical fitness exams for residency visas that Emirates Health Services carries out in a "
+        "year. عدد فحوصات اللياقة الطبية لتأشيرات الإقامة التي تجريها مؤسسة الإمارات للخدمات الصحية في السنة.",
     ),
     DataRule(
         # The file repeats Abu Dhabi's figures under Al-Ain, Delma and Madina
@@ -103,6 +118,8 @@ RULES: tuple[DataRule, ...] = (
         "counting each emirate once.",
         "تسجل البيانات المفتوحة لوزارة الموارد البشرية والتوطين {solved} شكوى عمالية محلولة في القطاع الخاص "
         "في عام {year}، مع احتساب كل إمارة مرة واحدة.",
+        "The number of private-sector labour complaints that MOHRE solves in a year. عدد الشكاوى العمالية في "
+        "القطاع الخاص التي تحلها وزارة الموارد البشرية والتوطين في السنة.",
     ),
 )
 
@@ -131,7 +148,7 @@ def run_rules(rules: Iterable[DataRule], run: SqlRunner | None, unavailable: str
     out = []
     for rule in rules:
         res = DataResult(rule.table, rule.sql, fact=rule.fact, source=source if run is not None else "",
-                         fact_ar=rule.fact_ar or None)
+                         fact_ar=rule.fact_ar or None, meaning=rule.meaning or None)
         if run is None:
             res.note = unavailable or "Open data not configured; lookup skipped"
         else:
