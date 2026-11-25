@@ -526,12 +526,8 @@
   }
 
   // ---------- knowledge base ----------
-  function kbLabel(k) {
-    const parts = [];
-    if (typeof k.documents === "number") parts.push(k.documents.toLocaleString("en-GB") + " documents");
-    if (typeof k.passages === "number") parts.push(k.passages.toLocaleString("en-GB") + " passages");
-    return k.name + (parts.length ? " (" + parts.join(", ") + ")" : "");
-  }
+  // The header line under the menu gives the active one's counts, so the menu shows names only.
+  function kbLabel(k) { return k.name || k.id; }
 
   async function loadKnowledgeBases() {
     const sel = $("kb-select");
