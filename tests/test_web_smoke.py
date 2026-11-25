@@ -91,9 +91,26 @@ LIVE_RECORD = copy.deepcopy(RECORD)
 LIVE_RECORD.update({"id": "q3", "question": "How do I renew my card?", "status": "screening", "check": None,
                     "retrieval": [], "audit": AUDIT[:3], "created_at": "2026-11-25T08:00:00.000Z"})
 
+# The shapes dalil/datasource.py status() returns, with and without a source.
 HEALTH = {"ok": True, "zetaris": False, "passages": 1024, "memory": True, "memories": 0,
           "knowledge_base": {"id": "uae", "name": "UAE government services", "documents": 53, "passages": 1024},
-          "data_source": {"connected": False, "kind": "zetaris", "label": "Open data", "tables": []}}
+          "data_source": {"connected": False, "kind": None, "label": "Open data: not configured", "tables": []}}
+HEALTH_LOCAL = {**HEALTH, "data_source": {"connected": True, "kind": "local", "label": "Open data: local database",
+                                          "tables": ["dalil.open_a", "dalil.open_b"]}}
+
+# An answer citing an open-data lookup, with a law's scope article added ahead of the ranked results.
+SQL = "SELECT year, transactions FROM dalil.open_a"
+DATA_RECORD = copy.deepcopy(RECORD)
+DATA_RECORD.update({"id": "q4", "question": "How many transactions were there in 2025?",
+                    "created_at": "2026-11-25T07:00:00.000Z",
+                    "data": [{"table": "dalil.open_a", "sql": SQL, "rows": [{"year": "2025", "transactions": "4242"}],
+                              "note": "", "source": "local", "source_label": "queried from the local database"}]})
+DATA_RECORD["retrieval"][1]["score"] = 0.0
+DATA_RECORD["check"] = {"status": "pass", "answer": "There were 4242 transactions in 2025.", "sentences": [
+    {"text": "There were 4242 transactions in 2025.", "kind": "claim", "kept": True, "reasons": [],
+     "citations": [{"ok": True, "reason": "value found", "table": "dalil.open_a", "sql": SQL, "value": "4242",
+                    "title": "Example transactions", "source_url": None,
+                    "source_label": "queried from the local database"}]}]}
 
 
 def summary(r: dict[str, Any]) -> dict[str, Any]:
@@ -105,12 +122,12 @@ def summary(r: dict[str, Any]) -> dict[str, Any]:
 
 def handle(route: Any, health: dict[str, Any]) -> None:
     path = route.request.url[len(BASE):].split("?")[0].split("#")[0]
-    records = {r["id"]: r for r in (RECORD, AR_RECORD, LIVE_RECORD)}
+    records = {r["id"]: r for r in (RECORD, AR_RECORD, LIVE_RECORD, DATA_RECORD)}
     body: Any = None
     if path == "/api/health":
         body = health
     elif path == "/api/questions":
-        body = [summary(r) for r in (RECORD, AR_RECORD, LIVE_RECORD)]
+        body = [summary(r) for r in (RECORD, AR_RECORD, LIVE_RECORD, DATA_RECORD)]
     elif path.startswith("/api/questions/"):
         body = records.get(path.rsplit("/", 1)[1])
     elif path.startswith("/api/documents/"):
@@ -162,7 +179,7 @@ def test_main_regions_render(browser):
     # A source that is simply not configured is not shown as an error.
     assert page.locator("#health .dot-off").count() == 1 and page.locator("#health .health-warn").count() == 0
     assert page.locator("#q-text").inner_text() == "Can I sponsor my parents?"
-    assert page.locator("#queue-list .queue-item").count() == 3
+    assert page.locator("#queue-list .queue-item").count() == 4
 
     stages = page.locator("#stages .stage")
     assert stages.count() == 6
@@ -241,6 +258,22 @@ def test_falls_back_to_todays_health_fields(browser):
     health = page.locator("#health").inner_text()
     assert "1,024 passages" in health and "not connected" in health
     assert page.locator("#health .health-warn").count() == 0
+    page.close()
+
+
+def test_open_data_source_and_citation(browser):
+    page = open_page(browser, "q4", health=HEALTH_LOCAL)
+    health = page.locator("#health").inner_text()
+    assert "local database, 2 tables" in health and page.locator("#health .dot-on").count() == 1
+    page.locator("#draft .chip").first.click()
+    view = page.locator("#source-view")
+    view.locator(".quote-mark").first.wait_for()
+    assert "Example transactions" in view.inner_text()
+    assert "queried from the local database" in view.inner_text()
+    assert page.locator("#source-view td.is-cited").inner_text().startswith("4242")
+    # The added scope article is labelled as added, not ranked as a match.
+    assert "scope article added" in page.locator("#searched").inner_text()
+    assert page.locator("#searched .hit-added").count() == 1
     page.close()
 
 

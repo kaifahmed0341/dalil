@@ -305,7 +305,8 @@
           return { part: "Searcher", node: "M", text: "Open-data lookup skipped: the data service is not connected. The answer uses the documents only." };
         }
         const rows = (d.rows || []).reduce((x, y) => x + (Number(y) || 0), 0);
-        return { part: "Searcher", node: "M", text: "Queried " + plural((d.tables || []).length, "open-data table") + ", " + plural(rows, "row") + " returned." };
+        const where = d.source === "local" ? " in the local database" : d.source === "zetaris" ? " through Zetaris" : "";
+        return { part: "Searcher", node: "M", text: "Queried " + plural((d.tables || []).length, "open-data table") + where + ", " + plural(rows, "row") + " returned." };
       }
       case "drafted": {
         const who = String(d.drafter || "");
@@ -477,11 +478,15 @@
   function dataLine(hl) {
     const ds = hl.data_source;
     if (ds && typeof ds === "object") {
-      const label = ds.label || ds.kind || "Open data";
+      // The server's label reads "Open data: local database"; show the part after the colon as the detail.
+      const full = String(ds.label || ds.kind || "Open data");
+      const at = full.indexOf(":");
+      const label = at > 0 ? full.slice(0, at).trim() : "Open data";
+      const what = at > 0 ? full.slice(at + 1).trim() : full;
       const n = Array.isArray(ds.tables) ? ds.tables.length : typeof ds.tables === "number" ? ds.tables : null;
       return ds.connected
-        ? { on: true, label, detail: "connected" + (n !== null ? ", " + plural(n, "table") : "") }
-        : { on: false, label, detail: "not configured, answers use the documents only" };
+        ? { on: true, label, detail: what + (n ? ", " + plural(n, "table") : "") }
+        : { on: false, label, detail: (what || "not configured") + ", answers use the documents only" };
     }
     return hl.zetaris
       ? { on: true, label: "Open data", detail: "connected" }
@@ -604,7 +609,7 @@
     return cites;
   }
 
-  function citeTitle(c) { return c.table ? (c.source_label || c.title || "Open-data table") : (c.title || c.doc_id); }
+  function citeTitle(c) { return c.table ? (c.title || "Open-data table") : (c.title || c.doc_id); }
 
   function chip(n) {
     const c = state.cites[n - 1];
@@ -891,7 +896,8 @@
               (state.record.data || []).find((x) => x.table === c.table);
     v.append(heading,
       h("p", tx(citeTitle(c), { class: "source-title" }), citeTitle(c)),
-      h("p", { class: "source-meta" }, "Open data, queried through Zetaris"),
+      // source_label says where the lookup ran, for example "queried from the local database".
+      h("p", { class: "source-meta" }, "Open data, " + (c.source_label || (d && d.source_label) || "queried through Zetaris")),
       c.source_url ? h("p", { class: "source-links" }, h("a", { href: c.source_url, target: "_blank", rel: "noopener noreferrer" }, "Open the dataset page")) : null,
       citeStatus(c),
       h("p", { class: "data-value" }, "Cited value: ", h("mark", { class: "quote-mark" }, String(c.value))));
@@ -940,7 +946,10 @@
     if (skipped) { box.append(h("p", { class: "muted" }, "Nothing was searched for this question.")); return; }
     if (!hits.length && !data.length) { box.append(h("p", { class: "muted" }, "Dalil found nothing relevant in the documents or the data tables.")); return; }
     if (hits.length) {
-      box.append(h("p", { class: "sub-title" }, "Passages found (" + hits.length + "), best match first"));
+      // A law's scope article can be added ahead of the ranked results (score 0); say so rather than call it a match.
+      const added = hits.filter((x) => x.score === 0).length;
+      box.append(h("p", { class: "sub-title" }, "Passages the writer was given (" + hits.length + ")" +
+        (added ? ": " + plural(added, "scope article") + " added, then the best matches" : ", best match first")));
       const ol = h("ol", { class: "hits" });
       hits.forEach((x, i) => {
         const cited = state.cites.some((c) => c.passage_id && c.passage_id === x.passage_id);
@@ -954,6 +963,7 @@
             h("span", { class: "hit-rank", "aria-hidden": "true" }, String(i + 1)),
             h("span", { class: "hit-title", dir: paraDir(title) }, h("bdi", tx(title), title), h("span", { class: "hit-page" }, ", page " + x.page)),
             cited ? h("span", { class: "tag-cited" }, "Cited") : null),
+          x.score === 0 ? h("span", { class: "hit-added" }, "Added: the law's own scope article") : null,
           x.heading ? h("span", tx(x.heading, { class: "hit-heading" }), x.heading) : null,
           h("span", tx(x.text, { class: "hit-text" }), x.text))));
       });

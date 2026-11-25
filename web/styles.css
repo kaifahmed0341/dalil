@@ -435,3 +435,4 @@ a:hover { color: #063d3e; }
   .review-bar { padding: 8px 20px; }
   .review-fields { grid-template-columns: minmax(140px, 12rem) minmax(0, 1fr); margin-bottom: 6px; }
 }
+.hit-added { font-size: 0.875rem; font-weight: 650; color: var(--working-fg); }
