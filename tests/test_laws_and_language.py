@@ -691,3 +691,22 @@ def test_arabic_grammar_carries_one_and_two_and_idioms_do_not_negate():
                "citations": [{"passage_id": q["passage_id"], "quote": q["text"]}]}
     check = v2.check_sentence(dropped)
     assert not check.kept and "leaves out numbers" in check.reasons[0]
+
+
+def test_rendering_ignores_attribution_and_bounds_and_cuts_stray_latin():
+    p = passage("sample-notice:p4:1", "According to Article 43 of the Labour Law, the notice period must not be less "
+                "than 30 days and not exceed 90 days.", kind="html")
+    seen = []
+
+    def similar(claim, windows):
+        seen.append(claim)
+        return [0.8 for _ in windows]
+    v = Verifier({p["passage_id"]: p}, similarity=similar)
+    ok = {"text": "وفقاً للمادة 43 من قانون العمل، يجب أن تكون مدة الإشعار 30 يوماً على الأقل و90 يوماً على الأكثر.",
+          "text_en": "The notice period must be at least 30 days and at most 90 days.",
+          "citations": [{"passage_id": p["passage_id"], "quote": p["text"]}]}
+    assert v.check_sentence(ok).kept
+    assert not seen[-1].startswith("وفقاً")  # compared without the attribution
+    slip = {**ok, "text": "يجب أن تكون مدة الإشعار 30 يوماً على الأقل و90 يوماً على الأكثر حسب acordo الطرفين."}
+    check = v.check_sentence(slip)
+    assert not check.kept and "acordo" in check.reasons[0]
