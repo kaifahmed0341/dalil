@@ -349,3 +349,48 @@ def test_running_headers_are_not_offered_as_sentences(tmp_path, monkeypatch):
             text=text, start=0, end=len(text), kind="pdf")
     offered = [s for _, s in LLMDrafter().numbered([h]).values()]
     assert offered == [bodies[1], bodies[1].replace(".", " again.")]
+
+
+def test_arabic_questions_also_search_with_their_english_translation(tmp_path):
+    from dalil.pipeline import fuse
+
+    class Translating:
+        def translate(self, q):
+            return "Does the records law cover public bodies?"
+
+        def draft(self, question, hits, data, notes=()):
+            return []
+
+    class ByLanguage(FakeRetriever):
+        def search(self, query, k=8):
+            self.queries.append(query)
+            return [as_hit(FED_OTHER, 3.0, 0.5)] if lang.language(query) == "ar" else [as_hit(PORTAL, 20.0)]
+
+    retriever = ByLanguage([])
+    p = Pipeline(Store(tmp_path / "d.db"), retriever, PASSAGES, drafter=Translating(), zetaris_factory=None)
+    rec = p.answer("هل يطبق قانون السجلات على الجهات العامة؟")
+    assert sorted(retriever.queries[:2]) == sorted(["Does the records law cover public bodies?",
+                                                    "هل يطبق قانون السجلات على الجهات العامة؟"])
+    events = {e["kind"]: e["detail"] for e in p.store.get(rec.id)["audit"]}
+    assert events["translated"]["english"].startswith("Does the records law")
+    assert {h["passage_id"] for h in rec.retrieval} >= {PORTAL["passage_id"], FED_OTHER["passage_id"]}
+    # Fusing keeps each passage's best keyword score, so the weak-retrieval gate sees the English match.
+    fused = fuse([as_hit(PORTAL, 20.0)], [as_hit(PORTAL, 1.0, 0.7), as_hit(FED_OTHER, 3.0)])
+    assert fused[0].passage_id == PORTAL["passage_id"] and fused[0].score == 20.0 and fused[0].dense == 0.7
+
+
+def test_english_questions_are_not_translated(tmp_path):
+    class Counting:
+        calls = 0
+
+        def translate(self, q):
+            Counting.calls += 1
+            return q
+
+        def draft(self, question, hits, data, notes=()):
+            return []
+
+    p = Pipeline(Store(tmp_path / "d.db"), FakeRetriever([as_hit(PORTAL)]), PASSAGES, drafter=Counting(),
+                 zetaris_factory=None)
+    p.answer("How do I see my records?")
+    assert Counting.calls == 0
