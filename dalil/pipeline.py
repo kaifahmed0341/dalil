@@ -310,7 +310,9 @@ class Pipeline:
             "sentences": len(draft),
             "kinds": [s.get("kind", "claim") for s in draft],
         })
-        draft = drop_repeats(draft)
+        drafted = len(draft)
+        draft = drop_repeats(draft, data)
+        repeats = drafted - len(draft)
         draft, attached = attach_data(draft, data)
         if client is None and any("sql" in c for s in draft for c in s.get("citations") or []):
             client, _ = self.data_source()
@@ -329,7 +331,8 @@ class Pipeline:
                                            "cut": len(check["sentences"]) - kept,
                                            **({"data_restated": sum(1 for s in draft if s.get("restated"))}
                                               if added else {}),
-                                           **({"data_citations_attached": attached} if attached else {})})
+                                           **({"data_citations_attached": attached} if attached else {}),
+                                           **({"repeats_dropped": repeats} if repeats else {})})
         status = "held" if check["status"] == "held" else "awaiting_review"
         retrieval = [asdict(h) for h in hits]
         data_dicts = [d.to_dict() for d in data]
@@ -351,17 +354,27 @@ def _numbers(text: str) -> set[str]:
     return numbers(text)
 
 
-def drop_repeats(draft: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """The draft without a claim whose text repeats an earlier claim word for word.
-    A small model sometimes writes the same sentence several times; one copy says it."""
+def drop_repeats(draft: list[dict[str, Any]], data: list[DataResult] = ()) -> list[dict[str, Any]]:
+    """The draft without claims that repeat an earlier one.
+
+    A small model sometimes writes the same sentence several times, or
+    follows "EHS carried out 1424313 exams in 2025." with "The data value is
+    1424313." A claim is a repeat when its text matches an earlier claim word
+    for word, or when every number in it is an open-data value (not a year
+    alone) that an earlier claim already stated. One copy says it."""
+    values = {n for res in data if res.rows for k, v in res.rows[0].items()
+              if v is not None and k.lower() != "year" for n in _numbers(str(v))}
     seen: set[str] = set()
+    said: set[str] = set()
     out = []
     for s in draft:
         if s.get("kind", "claim") == "claim":
             key = " ".join(str(s.get("text", "")).split()).casefold()
-            if key in seen:
+            nums = _numbers(str(s.get("text", "")))
+            if key in seen or (nums & values and nums <= said):
                 continue
             seen.add(key)
+            said |= nums
         out.append(s)
     return out
 
