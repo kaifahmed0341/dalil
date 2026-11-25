@@ -647,8 +647,12 @@ class LLMDrafter:
         if not has_data and (not numbered or weak(question, hits)):
             return [refusal()]
         rendering = lang.language(question) != lang.ENGLISH
+        # An Arabic claim comes with its English version, which doubles the
+        # reply: Arabic replies ran to 670 tokens against a 700 cap, and a
+        # longer one was cut off mid-JSON.
         raw = self.complete(self.messages(question, hits, data, notes, numbered, english=english),
-                            self.schema(numbered, data, rendering=rendering))
+                            self.schema(numbered, data, rendering=rendering),
+                            **({"max_tokens": self.max_tokens * 2} if rendering else {}))
         try:
             parsed = json.loads(raw)
         except ValueError as e:
@@ -724,9 +728,14 @@ class FallbackDrafter:
     def draft(self, question: str, hits: list[Hit], data: list[DataResult],
               notes: Sequence[str] = (), **kwargs: Any) -> list[dict[str, Any]]:
         try:
-            out = self.primary.draft(question, hits, data, notes=notes, **kwargs)
+            try:
+                out = self.primary.draft(question, hits, data, notes=notes, **kwargs)
+            except DraftError:
+                # A reply that was not JSON is usually a one-off of sampling:
+                # ask once more before falling back.
+                out = self.primary.draft(question, hits, data, notes=notes, **kwargs)
             self._local.used, self._local.error = type(self.primary).__name__, ""
             return out
-        except Exception as e:  # network, timeout, bad JSON: fall back, and say so
+        except Exception as e:  # network, timeout, bad JSON twice: fall back, and say so
             self._local.used, self._local.error = type(self.fallback).__name__, type(e).__name__
             return self.fallback.draft(question, hits, data, notes=notes)

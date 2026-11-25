@@ -223,10 +223,10 @@ _DUN_AMOUNT = re.compile(r"دون\s+(?:سن|عمر|[\d\u0660-\u0669])")
 
 
 # Phrases built on a negation word that do not negate: "ما لم" (unless),
-# "لا سيما" (especially), "لا بد" (must), and bounds, which say the same as
+# "لا سيما" (especially), "لا بد" (must), "لا يزال" and "ما زال" (still), and bounds, which say the same as
 # "at least" or "at most": "لا يقل عن", "not less than", "no more than".
 _AR_IDIOMS = re.compile(
-    r"ما\s+لم|لا\s*سي[ّ]?ما|لا\s+بد|لابد|[لأ]ل?ا\s+[يت](?:قل|زيد|تجاوز)\w*|[لأ]ل?ا\s+تتجاوز"
+    r"ما\s+لم|لا\s*سي[ّ]?ما|لا\s+بد|لابد|[لم]ا\s+[يت]زال|[لأ]ل?ا\s+[يت](?:قل|زيد|تجاوز)\w*|[لأ]ل?ا\s+تتجاوز"
     r"|\b(?:not|no)\s+(?:be\s+)?(?:less|more|fewer|later|earlier|longer|shorter)\s+than\b"
     r"|\bnot\s+(?:be\s+)?(?:exceed|exceeding)\b",
     re.IGNORECASE)

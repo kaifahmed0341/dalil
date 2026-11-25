@@ -447,6 +447,13 @@ class Pipeline:
         draft, unrelated = drop_unrelated_passages(draft, data)
         if client is None and any("sql" in c for s in draft for c in s.get("citations") or []):
             client, _ = self.data_source()
+        if not draft:
+            # Nothing is left to check, for example when every drafted
+            # sentence was dropped as a repeat. A reviewer never gets an
+            # empty answer: Dalil says it cannot answer, and records why.
+            draft = [refusal(lang.fixed(WEAK_REFUSAL, question_lang))]
+            self.store.event(qid, "emptied", {"reason": "no drafted sentence was left to check",
+                                              "drafter": ran})
         subjects = {d: self.titles[d] for d in subject_docs(english or q, self.titles)
                     if any(h.doc_id == d for h in hits)}
         verifier = Verifier(self.passages, data_lookup(client) if client else None,
