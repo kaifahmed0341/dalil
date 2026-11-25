@@ -423,9 +423,11 @@ def test_a_wrong_number_gets_no_data_citation(tmp_path, local):
         {"text": "Emirates Health Services carried out 1424314 medical fitness exams.", "kind": "claim",
          "citations": [QUOTE]},
     ])
+    p.redraft = False  # look at the model's own sentence, not the fallback that replaces an all-cut answer
     rec = p.answer("How many medical fitness exams for residency visas does Emirates Health Services carry out?")
-    assert not rec.check["sentences"][0]["kept"]
-    assert not any(c.get("sql") for c in rec.check["sentences"][0]["citations"])
+    wrong = next(x for x in rec.check["sentences"] if "1424314" in x["text"])
+    assert not wrong["kept"]
+    assert not any(c.get("sql") for c in wrong["citations"])
 
 
 def test_a_year_alone_attaches_nothing(tmp_path, local):
@@ -466,3 +468,15 @@ def test_a_claim_with_a_new_number_is_not_a_repeat(tmp_path, local):
     ])
     rec = p.answer("How many medical fitness exams for residency visas does Emirates Health Services carry out?")
     assert len(rec.check["sentences"]) == 2
+
+
+def test_a_claim_naming_a_table_is_dropped(tmp_path, local):
+    first = "In 2025, Emirates Health Services carried out 1424313 medical fitness exams for residency visas."
+    p = scripted(tmp_path, local, [
+        {"text": first, "kind": "claim", "citations": [QUOTE]},
+        {"text": "The data is from the open_ehs_medical_fitness table.", "kind": "claim", "citations": [QUOTE]},
+    ])
+    rec = p.answer("How many medical fitness exams for residency visas does Emirates Health Services carry out?")
+    assert [s["text"] for s in rec.check["sentences"]] == [first]
+    verified = next(e for e in p.store.get(rec.id)["audit"] if e["kind"] == "verified")
+    assert verified["detail"]["internal_names_dropped"] == 1

@@ -276,6 +276,7 @@ class Verifier:
                  allowed_passages: Iterable[str] | None = None, titles: Mapping[str, str] | None = None,
                  laws: Mapping[str, Any] | None = None,
                  similarity: Callable[[str, list[str]], list[float] | None] | None = None,
+                 question: str = "", subjects: Mapping[str, str] | None = None,
                  data_facts: Mapping[str, str] | None = None):
         """`allowed_sql`: the queries the pipeline itself ran. A data citation must
         name one of them exactly, so a drafter cannot write its own SQL, such as
@@ -302,6 +303,10 @@ class Verifier:
         # Meaning similarity for a claim in another language than its sources.
         # Without it such a claim cannot be checked and is cut.
         self.similarity = similarity
+        # The (redacted) question, and doc_id -> title of the documents it is
+        # about (dalil.subjects). Empty leaves those rules off.
+        self.question = question
+        self.subjects = dict(subjects or {})
 
     def check_quote(self, citation: Mapping[str, Any]) -> CitationCheck:
         cit = dict(citation)
@@ -423,6 +428,12 @@ class Verifier:
                 if share < SUPPORT_MIN:
                     result.kept = False
                     result.reasons.append(f"claim is not supported by its sources (key words found: {share:.0%})")
+                elif self.question:
+                    missing = self.stitched(text, result.citations)
+                    if missing:
+                        result.kept = False
+                        result.reasons.append("no one source says what the claim answers; missing from every "
+                                              "single document: " + ", ".join(missing))
             # Negations count as one class: "cannot" is backed by a source's "will not".
             # "No." in "Law No. 45" is a law reference, not a negation.
             added = sorted(_words(_LAW_NUMBER.sub(" ", text)) & _NEGATIONS)
@@ -430,6 +441,53 @@ class Verifier:
                 result.kept = False
                 result.reasons.append("claim adds a negation its sources do not have: " + ", ".join(added))
         return result
+
+    def stitched(self, claim: str, citations: list[CitationCheck]) -> list[str]:
+        """The claim's words that repeat the question and that no single cited
+        document holds, or [] when one document holds them all.
+
+        The words a claim shares with the question are what it answers. When
+        they are found only across two documents, the claim joins two rules,
+        as in "Golden visa holders can sponsor their parents", built from a
+        Golden visa page that names spouses and children and a page on a UAE
+        citizen's parent. Each document counts with its title and the text
+        just before the quote."""
+        from dalil.retrieve import tokenize
+        asked = {t for t in tokenize(claim) if not t.isdigit()} & set(tokenize(self.question))
+        if not asked:
+            return []
+        by_doc: dict[str, set[str]] = {}
+        for c in citations:
+            if c.ok and c.doc_id:
+                by_doc.setdefault(c.doc_id, set()).update(tokenize(f"{c.title} {c.context} {c.evidence}"))
+        if len(by_doc) < 2:
+            return []  # one document: the support check above already applies
+        best = min((asked - words for words in by_doc.values()), key=len)
+        return sorted(best)
+
+    def check_subject(self, checks: list[SentenceCheck]) -> None:
+        """Cut a claim that applies another service's rule to the one asked about.
+
+        When the question names a service or law that has its own document,
+        a claim that cites only other documents is kept only if the text it
+        quotes names that subject too."""
+        from dalil.subjects import names_subject
+        if not self.subjects:
+            return
+        names = [t.split("|")[0].strip() for t in self.subjects.values()]
+        for s in checks:
+            if not s.kept or s.kind in UNCITED_KINDS:
+                continue
+            docs = {c.doc_id for c in s.citations if c.ok and c.doc_id}
+            # A law is the authority on its topic, not another service's page;
+            # the law rules above check which law a claim presents.
+            if not docs or docs & set(self.subjects) or docs & set(self.laws):
+                continue
+            if any(names_subject(f"{c.title} {c.context} {c.evidence}", names) for c in s.citations if c.ok):
+                continue
+            s.kept = False
+            s.reasons.append(f"its source is about another service, not {' or '.join(sorted(set(names)))}, "
+                             "which the question asks about")
 
     def check_laws(self, checks: list[SentenceCheck]) -> None:
         """Cut a claim that presents one law's text as another law's.
@@ -474,6 +532,7 @@ class Verifier:
         checks = [self.check_sentence(s) for s in sentences]
         if self.laws:
             self.check_laws(checks)
+        self.check_subject(checks)
         claims = [s for s in checks if s.kind not in UNCITED_KINDS]
         cut_claims = sum(not s.kept for s in claims)
         cut_other = sum(not s.kept for s in checks if s.kind in UNCITED_KINDS)

@@ -24,10 +24,10 @@ def store(tmp_path):
     return Store(tmp_path / "dalil.db")
 
 
-def make(store, passages, hits=None, drafter=None, zetaris=None):
+def make(store, passages, hits=None, drafter=None, zetaris=None, redraft=True):
     hits = hits if hits is not None else [hit(PASSAGES[0], 20.0), hit(PASSAGES[1], 15.0)]
     factory = (lambda: zetaris) if zetaris is not None else None
-    return Pipeline(store, FakeRetriever(hits), passages, drafter=drafter, zetaris_factory=factory)
+    return Pipeline(store, FakeRetriever(hits), passages, drafter=drafter, zetaris_factory=factory, redraft=redraft)
 
 
 # --- drafter -------------------------------------------------------------------
@@ -161,9 +161,27 @@ class Broken:
 
 
 def test_fabricated_quote_is_held(store, passages):
-    rec = make(store, passages, drafter=Fabricator()).answer("What does renewing the resident card cost?")
+    rec = make(store, passages, drafter=Fabricator(), redraft=False).answer("What does renewing the resident card cost?")
     assert rec.status == "held"
     assert not rec.check["sentences"][0]["kept"]
+
+
+def test_when_every_claim_is_cut_the_sources_are_quoted_instead(store, passages):
+    rec = make(store, passages, drafter=Fabricator()).answer("What does renewing the resident card cost?")
+    assert rec.status == "awaiting_review"
+    kept = [s for s in rec.check["sentences"] if s["kept"] and s["kind"] == "claim"]
+    assert kept and all(s["citations"][0]["quote"] == s["text"] for s in kept)  # whole source sentences
+    assert "AED 50" not in rec.check["answer"]
+    events = {e["kind"]: e["detail"] for e in store.get(rec.id)["audit"]}
+    assert events["redrafted"]["drafter"] == "ExtractiveDrafter"
+
+
+def test_no_redraft_when_the_quotes_fail_too(store, passages):
+    # Weak retrieval: the extractive drafter can only refuse, so the bad draft stays held.
+    rec = make(store, passages, hits=[hit(PASSAGES[0], 2.0)], drafter=Fabricator()).answer(
+        "What does renewing the resident card cost?")
+    assert rec.status == "held"
+    assert "redrafted" not in [e["kind"] for e in store.get(rec.id)["audit"]]
 
 
 def test_wrong_number_is_cut(store, passages):
@@ -185,7 +203,7 @@ def test_drafter_failure_is_held_and_logged(store, passages):
 def test_review_rules(store, passages):
     p = make(store, passages)
     ok = p.answer("How early can I renew my resident card?")
-    held = make(store, passages, drafter=Fabricator()).answer("What does renewing the resident card cost?")
+    held = make(store, passages, drafter=Fabricator(), redraft=False).answer("What does renewing the resident card cost?")
     with pytest.raises(ReviewError):
         store.review(held.id, "approve", "amna")
     store.review(held.id, "reject", "amna", "Made-up price.")
