@@ -104,11 +104,15 @@ uv run python scripts/run_itu_scenarios.py --language ar    # Arabic
 
 ## Measured
 
-All on the laptop below, with Nemotron 3 Nano 4B drafting. The full numbers, with the runs before this version, are in [docs/evaluation.md](docs/evaluation.md).
+On the laptop below, with Nemotron 3 Nano 4B drafting, against the code shown in the 25 November video. Every number, with its runs, is in [docs/evaluation.md](docs/evaluation.md).
 
-- **Seven ITU scenarios:** 10 of 10 steps in English in every run; in Arabic, see docs/evaluation.md.
-- **Data-protection question**, "Does the UAE data protection law cover how a government entity handles my personal data?": the answer cites the law's Article 2(2), "shall not apply to ... Governmental entities which control or process Personal Data", in 10 runs of 10, in English and in Arabic. Before this version, 1 of 10.
-- **Citation evaluation**, 41 questions across the covered policies, each with the documents a correct answer may cite: `scripts/eval_citations.py`. See docs/evaluation.md for the share of kept claims that cite an expected document.
+| | Before | Now |
+|---|---|---|
+| Data-protection question cites Article 2(2), the exclusion, 10 runs | 1 | 10, in English and in Arabic |
+| ITU scenarios, English | 10 of 10 | 10 of 10, twice |
+| ITU scenarios, Arabic, 5 runs | not measured | 8 to 9 of 10 per run |
+| Kept claims citing an expected document, 41 questions | 113 of 117 (0.966), 40 questions | 114 of 116 (0.983) |
+| "Can a Golden Visa holder sponsor their parents?", answers drawing only on the Golden Visa page, 10 runs | 0 | 9; the tenth adds a true side sentence |
 
 ```bash
 uv run python scripts/eval_citations.py                     # the 41 questions
@@ -121,7 +125,7 @@ uv run python scripts/calibrate_cross_language.py           # the checker's Arab
 
 Tested on an Apple M3 Pro laptop with 18 GB of memory: both models on the GPU through Metal use about 4.8 GB, and nothing connects to the network. A Linux machine works the same way on its CPU, more slowly.
 
-You need, once, while online: Python 3.13 with [uv](https://docs.astral.sh/uv/) and `uv sync --all-extras`; Node 22.7 or later for the review memory; llama.cpp's `llama-server`; and the two model files:
+You need, once, while online: Python 3.13 with [uv](https://docs.astral.sh/uv/) and `uv sync --all-extras`; Node 22 for the review memory (22.7 or later; Node 26 dropped an option the vendored H-MEM code needs, and Dalil then runs without review memory and says so); llama.cpp's `llama-server`; and the two model files:
 
 | Model | File | SHA-256 | Licence |
 |---|---|---|---|
@@ -151,7 +155,7 @@ uv run python scripts/selftest_verify.py                            # the checke
 
 ## What it does not do
 
-A 4B model writes the drafts, so it sometimes picks a correct sentence that does not answer the question; the checker cannot judge relevance, and the reviewer does. A claim in Arabic that renders an English source is checked by meaning with the embedding model, which catches unrelated claims but not every mistranslation; on 25 labelled pairs it kept no wrong claim, and the closest wrong one scored 0.54 against a threshold of 0.55. Three documents are in Arabic, so most Arabic answers translate English service pages. Dalil keeps no conversation state: a follow-up restates the whole question.
+A 4B model writes the drafts, so it sometimes picks a true sentence that does not answer the question; the checker cannot judge relevance, and the reviewer does. Most service pages exist only in English, so an Arabic answer usually renders an English source, and the checker compares those by meaning with the embedding model: it kept no wrong claim on 25 labelled pairs, but it also cuts some correct Arabic claims, which is why scenario S7 passes 2 times of 5 in Arabic. Sourced answers take 8 to 15 seconds on this laptop. Dalil keeps no conversation state: a follow-up restates the whole question.
 
 ## Built with
 
