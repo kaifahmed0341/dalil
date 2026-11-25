@@ -729,3 +729,18 @@ def test_echoed_sentence_ids_are_removed_from_claims():
                                               "citations": [{"sentence": "S1"}]}]})
     out = Echo().draft("Can I see my records?", [as_hit(PORTAL, 20.0)], [])
     assert out[0]["text"].startswith("The records law")
+
+
+def test_scaffolding_is_removed_from_claims():
+    from dalil.draft import _clean_claim
+    assert _clean_claim("المادة (2) | قانون السجلات رقم (7) لسنة 2020 [scope] [other subject] 2. لا يسري القانون على "
+                        "السجلات العامة.") == "قانون السجلات رقم (7) لسنة 2020 2. لا يسري القانون على السجلات العامة."
+    assert _clean_claim("[S3] Records are kept for five years.") == "Records are kept for five years."
+
+
+def test_naming_the_cited_law_by_its_title_is_supported():
+    v = Verifier(PASSAGES, titles=TITLES)
+    claim = {"text": "Federal Law No. (7) of 2020 on Personal Records: provisions of this Law shall not apply to "
+                     "public records or public bodies which keep or use Personal Records.",
+             "citations": [cite(FED_SCOPE, FED_QUOTE)]}
+    assert v.check_sentence(claim).kept

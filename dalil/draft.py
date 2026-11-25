@@ -185,7 +185,28 @@ def _open_list(unit: str) -> bool:
     return bool(re.search(r":\s", unit))
 
 
-_ECHOED_ID = re.compile(r"\[\s*S\d+\s*\]")
+# Prompt scaffolding the model sometimes copies into a claim: sentence ids,
+# passage markers, and a passage header line.
+_ECHOED_ID = re.compile(r"\[\s*S\d+\s*\]|\[(?:scope|other subject)\]")
+_ECHOED_HEADER = re.compile(r"^.*\s\|\s")
+
+
+def _clean_claim(text: str) -> str:
+    text = _ECHOED_ID.sub(" ", text or "")
+    if " | " in text:  # "المادة (2) | <title> ... 2. لا تسري ..." -> the part after the header
+        text = _ECHOED_HEADER.sub("", text)
+    return " ".join(text.split())
+
+
+@functools.cache
+def law_docs() -> frozenset[str]:
+    """doc_ids of the numbered laws in the manifest."""
+    from dalil.corpus import load_manifest
+    from dalil.laws import law_refs
+    try:
+        return frozenset(law_refs(load_manifest()))
+    except Exception:
+        return frozenset()
 
 
 def heading_like(unit: str) -> bool:
@@ -525,7 +546,7 @@ class LLMDrafter:
                 head = f" | {h.heading}" if h.heading else ""
                 title = f" | {titles[h.doc_id]}" if titles.get(h.doc_id) else ""
                 mark = " [scope]" if scope and _is_scope(h) else ""
-                if subjects and h.doc_id not in subjects:
+                if subjects and h.doc_id not in subjects and h.doc_id not in law_docs():
                     mark += " [other subject]"
                 parts.append(f"Passage {h.passage_id}{head}{title}{mark}")
                 parts += by_passage[h.passage_id]
@@ -625,10 +646,9 @@ class LLMDrafter:
         data_sqls = {d.sql for d in data if d.rows}
         out: list[dict[str, Any]] = []
         for s in (parsed.get("sentences") or [])[:5]:
-            # The model sometimes echoes the ids it was shown, "[S10] ...".
-            text = _ECHOED_ID.sub(" ", str(s.get("text") or "")).strip()
-            text = " ".join(text.split())
-            text_en = " ".join(_ECHOED_ID.sub(" ", str(s.get("english") or "")).split())
+            # The model sometimes echoes the ids or headers it was shown.
+            text = _clean_claim(str(s.get("text") or ""))
+            text_en = _clean_claim(str(s.get("english") or ""))
             cits = []
             for c in s.get("citations") or []:
                 if not isinstance(c, dict):

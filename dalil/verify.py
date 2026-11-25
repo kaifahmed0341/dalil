@@ -497,7 +497,9 @@ class Verifier:
         if result.kept and quotes:
             # A drafter may reword its sources. The claim's key words must mostly
             # be in them, and it may not add a negation they lack.
-            evidence = " ".join(f"{c.context} {c.evidence}" for c in result.citations)
+            # A cited document's title counts too: the writer is told to name
+            # the law it quotes, and naming it adds no claim.
+            evidence = " ".join(f"{c.title} {c.context} {c.evidence}" for c in result.citations)
             if _script(text) != _script(" ".join(quotes)) and result.text_en \
                     and _script(result.text_en) == _script(" ".join(quotes)):
                 self.check_rendering(result, evidence, quotes)
