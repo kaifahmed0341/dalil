@@ -44,6 +44,8 @@ WEAK_SCORE = 10.0
 # Measured on the Arabic versions of the ITU scenarios and off-topic Arabic
 # probes; see docs/evaluation.md.
 WEAK_DENSE = 0.40
+# A translation is one short call; past this, search goes on without it.
+TRANSLATE_TIMEOUT = 20.0
 MAX_SENTENCES = 4
 MAX_PER_PASSAGE = 2
 TOP_PASSAGES = 5
@@ -147,7 +149,7 @@ def _sentences(text: str, pdf: bool = False) -> list[str]:
     return out
 
 
-def units(text: str, pdf: bool = False, limit: int = LIST_UNIT_CHARS) -> list[str]:
+def units(text: str, pdf: bool = False, limit: int = LIST_UNIT_CHARS, page: int | None = None) -> list[str]:
     """Sentences, with a list kept whole under its lead-in.
 
     A list item quoted alone can say the opposite of the law: "b.
@@ -159,9 +161,13 @@ def units(text: str, pdf: bool = False, limit: int = LIST_UNIT_CHARS) -> list[st
     """
     out: list[str] = []
     for sentence in _sentences(text, pdf):
-        if pdf:
-            sentence = _PAGE_NUMBER_LEAD.sub("", sentence)
         prev = out[-1] if out else ""
+        lead = _PAGE_NUMBER_LEAD.match(sentence) if pdf and page is not None else None
+        if lead and int(lead.group(0)) == page and not prev.endswith(":"):
+            # The page's own number, printed before a sentence that runs
+            # over from the page before. Stripping a prefix keeps the unit
+            # one stretch of the passage.
+            sentence = sentence[lead.end():].lstrip()
         # An item joins its list when it has a marker, or when the item
         # before it ends in a semicolon, as unmarked lists in laws do.
         joins = prev.endswith(":") or (_open_list(prev) and (
@@ -197,7 +203,7 @@ def heading_like(unit: str) -> bool:
 
 _SMALL_WORDS = frozenset("a an and as at by for from in of on or the to with".split())
 # A page number left at the start of a sentence that runs over from the page before.
-_PAGE_NUMBER_LEAD = re.compile(r"^\d{1,4} (?=[a-z])")
+_PAGE_NUMBER_LEAD = re.compile(r"^\d{1,4}(?= [a-z])")
 
 
 def _usable(sentence: str) -> bool:
@@ -461,7 +467,7 @@ class LLMDrafter:
         for h in sorted(hits, key=lambda h: not _is_scope(h)) if scope_first else hits:
             used = 0
             furniture = running.get(h.doc_id, frozenset())
-            for sentence in units(h.text, pdf=h.kind == "pdf"):
+            for sentence in units(h.text, pdf=h.kind == "pdf", page=h.page):
                 if furniture and _line_key(sentence) in furniture:
                     continue
                 used += len(sentence)
@@ -563,11 +569,11 @@ class LLMDrafter:
         ]
         schema = {"type": "object", "additionalProperties": False, "required": ["english"],
                   "properties": {"english": {"type": "string", "minLength": 3, "maxLength": 400}}}
-        raw = self.complete(messages, schema, max_tokens=160, temperature=0.0)
+        raw = self.complete(messages, schema, max_tokens=160, temperature=0.0, timeout=TRANSLATE_TIMEOUT)
         return str(json.loads(raw).get("english") or "").strip()
 
     def complete(self, messages: list[dict[str, str]], schema: dict[str, Any],
-                 max_tokens: int | None = None, temperature: float = 0.1) -> str:
+                 max_tokens: int | None = None, temperature: float = 0.1, timeout: float | None = None) -> str:
         body = {
             "model": self.model, "messages": messages, "temperature": temperature,
             "max_tokens": max_tokens or self.max_tokens,
@@ -582,7 +588,7 @@ class LLMDrafter:
         if self.api_key:
             headers["authorization"] = f"Bearer {self.api_key}"
         req = Request(f"{self.url}/chat/completions", data=json.dumps(body).encode("utf-8"), headers=headers)
-        with urlopen(req, timeout=self.timeout) as r:
+        with urlopen(req, timeout=timeout or self.timeout) as r:
             out = json.loads(r.read().decode("utf-8"))
         self.last_usage = {**(out.get("usage") or {}), **(out.get("timings") or {})}
         return out["choices"][0]["message"]["content"] or ""

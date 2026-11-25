@@ -92,14 +92,42 @@ _NUMBER_WORD = re.compile(
     re.IGNORECASE)
 
 
+# Arabic number words, in the normalised form tokenize() makes (alef forms
+# unified, ta marbuta as ha, alef maqsura as ya), with their values. A word
+# may carry a prefix such as و or ب; tokenize() strips the article.
+_AR_NUMBER_WORDS: dict[str, int] = {}
+for _value, _forms in {
+    1: "واحد واحده", 2: "اثنان اثنين اثنتان اثنتين يومين شهرين عامين سنتين", 3: "ثلاث ثلاثه", 4: "اربع اربعه",
+    5: "خمس خمسه", 6: "ست سته", 7: "سبع سبعه", 8: "ثماني ثمانيه ثمان", 9: "تسع تسعه", 10: "عشر عشره",
+    20: "عشرون عشرين", 30: "ثلاثون ثلاثين", 40: "اربعون اربعين", 50: "خمسون خمسين", 60: "ستون ستين",
+    70: "سبعون سبعين", 80: "ثمانون ثمانين", 90: "تسعون تسعين", 100: "مائه مئه", 200: "مائتان مائتين مئتان مئتين",
+    1000: "الف", 2000: "الفان الفين",
+}.items():
+    for _form in _forms.split():
+        _AR_NUMBER_WORDS[_form] = _value
+
+
+def _arabic_number_words(text: str) -> set[str]:
+    from dalil.retrieve import tokenize
+    out = set()
+    for token in tokenize(text, stem=True):
+        for word in (token, token[1:] if token[:1] in "وبلف" else token):
+            if word in _AR_NUMBER_WORDS:
+                out.add(str(_AR_NUMBER_WORDS[word]))
+                break
+    return out
+
+
 def numbers(text: str) -> set[str]:
     """Numbers in `text`, with grouping commas removed, so 1,000 matches 1000.
 
     Numbers written as words count too: "fifty" is 50 and "twenty-one" is 21,
-    so a model cannot get a number past the check by spelling it out.
+    in Arabic as in English ("ثلاثون" is 30), so a model cannot get a number
+    past the check by spelling it out.
     """
     text = unicodedata.normalize("NFKC", text).translate(_ARABIC_DIGITS)
     found = {m.group(0).replace(",", "") for m in _NUMBER.finditer(text)}
+    found |= _arabic_number_words(text)
     for m in _NUMBER_WORD.finditer(text):
         if m.group(1):
             found.add(str(_TENS[m.group(1).lower()] + _UNITS[m.group(2).lower()]))
@@ -139,7 +167,10 @@ CONTEXT_CHARS = 200
 
 
 def _words(text: str) -> set[str]:
-    return set(re.findall(r"[a-z']+|[\u0621-\u064a]+", unicodedata.normalize("NFKC", text).lower().translate(_FOLD)))
+    from dalil.retrieve import normalise_arabic
+    # Arabic vowel marks are dropped first, so "لَا" is read as "لا".
+    plain = normalise_arabic(unicodedata.normalize("NFKC", text).lower().translate(_FOLD))
+    return set(re.findall(r"[a-z']+|[\u0621-\u064a]+", plain))
 
 
 def clauses(text: str, size: int = 30) -> list[str]:

@@ -105,7 +105,9 @@ def guidance(question: str, memories: Iterable[dict[str, Any]], threshold: float
         score = similarity(question, other)
         if score < threshold and english is not None and not (question.isascii() and other.isascii()):
             try:
-                score = max(score, similarity(english(question), english(other)))
+                a, b = english(question), english(other)
+                if a and b:
+                    score = max(score, similarity(a, b))
             except Exception:  # no model: words alone decide
                 pass
         if score < threshold:

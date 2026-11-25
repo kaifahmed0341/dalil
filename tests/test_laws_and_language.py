@@ -65,7 +65,9 @@ TITLES = {FED.doc_id: FED.title, EMIRATE.doc_id: EMIRATE.title}
 
 
 def test_law_ref_reads_jurisdiction_number_and_year_from_titles():
-    ref = law_ref("x", "Federal Decree by Law No. (12) of 2019 Concerning Sample Things", "sample: SPL text")
+    ref = law_ref("x", "Federal Decree by Law No. (12) of 2019 Concerning Sample Things",
+                  "sample: SPL Federal Decree-Law 12 of 2019 full text")
+    assert law_ref("x", "Federal Decree by Law No. (12) of 2019", "sample: GDRFA page").aliases == ()
     assert (ref.jurisdiction, ref.number, ref.year, ref.aliases) == ("federal", "12", "2019", ("SPL",))
     assert law_ref("y", "Law No. (4) of 2011 Regulating Samples in the Emirate of Dubai").key == ("dubai", "4", "2011")
     # Arabic title with bidi controls around the digits.
@@ -419,3 +421,84 @@ def test_review_memory_matches_arabic_phrasings_in_english():
     assert g.avoid == {"p-probation"} and g.notes == ["probation rules"]
     # English questions are matched by their own words, with no translation.
     assert guidance("How long is maternity leave?", memories, english=lambda t: 1 / 0).avoid == set()
+
+
+
+# --- review round 1 ------------------------------------------------------------------
+
+
+def test_arabic_number_words_must_be_in_the_source():
+    from dalil.verify import numbers
+    assert numbers("مدة الإشعار ثلاثون يوماً") == {"30"}
+    assert numbers("ستون يوماً وخمسة أيام") >= {"60", "5"}
+    p = passage("sample-notice:p1:1", "The notice period must be at least thirty days.", kind="html")
+    v = Verifier({p["passage_id"]: p}, similarity=lambda c, w: [0.9 for _ in w])
+    quote = {"passage_id": p["passage_id"], "quote": "The notice period must be at least thirty days."}
+    assert v.check_sentence({"text": "يجب ألا تقل مدة الإشعار عن ثلاثين يوماً.", "citations": [quote]}).kept
+    changed = v.check_sentence({"text": "يجب ألا تقل مدة الإشعار عن ستين يوماً.", "citations": [quote]})
+    assert not changed.kept and "60" in changed.reasons[0]
+
+
+def test_vowelled_arabic_negation_is_caught():
+    claim = {"text": "لَا يحق للجهات العامة حفظ السجلات.", "citations": [cite(PORTAL, PORTAL_QUOTE)]}
+    check = Verifier(PASSAGES, similarity=lambda c, w: [0.9 for _ in w]).check_sentence(claim)
+    assert not check.kept and "negation" in check.reasons[0]
+
+
+@pytest.mark.parametrize("q", ["هل يمكنني أن أزور دبي بتأشيرة سياحية؟",
+                               "هل يمكنني البقاء دون غرامة خلال فترة السماح؟",
+                               "هل يمكنني تجديد الإقامة بدون غرامة إذا جددتها قبل انتهائها؟"])
+def test_fair_arabic_questions_are_not_refused(q):
+    assert not safety.screen(q).is_rule_evasion
+
+
+@pytest.mark.parametrize("q", ["كيف أبقى بعد انتهاء التأشيرة دون دفع غرامة؟",
+                               "أريد تزوير شهادة راتب", "هل يقبلون عقد إيجار مزور؟"])
+def test_arabic_rule_dodging_is_refused(q):
+    assert safety.screen(q).is_rule_evasion
+
+
+def test_federal_entities_do_not_name_a_federal_law_in_arabic():
+    assert jurisdictions_named("تُطبّق أحكام هذا القانون على الجهات الحكومية الاتحادية في الإمارة") == set()
+    assert jurisdictions_named("لا يسري القانون الاتحادي على السجلات العامة.") == {"federal"}
+    assert jurisdictions_named("يسري قانون السجلات لإمارة دبي على الجهات المحلية.") == {"dubai"}
+
+
+def test_a_coincidental_number_does_not_name_a_law():
+    assert not EMIRATE.named_in("You must answer within 3 days.")
+    assert EMIRATE.named_in("Under Law No. 3 of 2019, records must be kept.")
+    assert EMIRATE.named_in("بموجب القانون رقم 3 يجب حفظ السجلات.")
+
+
+def test_a_failed_translation_is_cached_and_bounded(tmp_path):
+    from dalil.pipeline import MEMORY_TRANSLATIONS
+
+    class Flaky:
+        calls = 0
+
+        def translate(self, q):
+            Flaky.calls += 1
+            raise TimeoutError("slow model")
+
+        def draft(self, question, hits, data, notes=(), english=""):
+            return []
+
+    class Memory:
+        def recall(self, q, top=50):
+            return {"memories": [{"id": f"m{i}", "kind": "rejected", "question": f"سؤال مختلف رقم {i}",
+                                  "passage_ids": ["x"]} for i in range(50)]}
+
+    p = Pipeline(Store(tmp_path / "d.db"), FakeRetriever([as_hit(PORTAL)]), PASSAGES, drafter=Flaky(),
+                 zetaris_factory=None, memory=Memory())
+    p.answer("هل يطبق قانون السجلات على الجهات العامة؟")
+    # One try for the question itself, then at most MEMORY_TRANSLATIONS for past reviews.
+    assert Flaky.calls <= 1 + MEMORY_TRANSLATIONS + 1
+
+
+def test_page_number_is_stripped_only_when_it_is_the_page_and_never_when_joining():
+    text = "Records law, page header\n6 indicates, in a clear manner, that the keeper agrees to the request."
+    assert units(text, pdf=True, page=6)[-1].startswith("indicates, in a clear manner")
+    assert units(text, pdf=True, page=7)[-1].startswith("6 indicates")
+    listed = "The following apply:\n6 records are kept by the keeper for the period the law sets."
+    out = units(listed, pdf=True, page=6)
+    assert " ".join(out[0].split()) in " ".join(listed.split())  # still one stretch of the passage
