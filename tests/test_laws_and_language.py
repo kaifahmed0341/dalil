@@ -578,3 +578,116 @@ def test_a_failed_translation_is_retried_by_a_later_request(tmp_path):
     to_english = p._to_english("سؤال", "")
     assert to_english("سؤال") == ""  # failed in this request
     assert p._to_english("سؤال", "")("سؤال") == "Does the records law cover public bodies?"  # next request
+
+
+# --- review round 3 ------------------------------------------------------------------
+
+
+def test_ordinary_words_are_not_read_as_numbers():
+    from dalil.verify import numbers
+    assert numbers("تبدأ الفترة من تاريخ المخالفة") == set()
+    assert numbers("الإفصاح عن البيانات") == set()
+    assert numbers("للثلاثين يوماً") == {"30"}
+    assert len(numbers("ثلاثة آلاف درهم")) == 2
+
+
+def test_soft_negations_are_backed_only_by_what_they_mean():
+    p = passage("sample-leave:p1:1", "The worker may leave work after giving notice under Article 43 to the other party.",
+                kind="html")
+    v = Verifier({p["passage_id"]: p}, similarity=lambda c, w: [0.9 for _ in w])
+    claim = {"text": "يحق للعامل ترك العمل دون إشعار.", "citations": [{"passage_id": p["passage_id"], "quote": p["text"]}]}
+    assert not v.check_sentence(claim).kept  # "without notice" is not backed by "under Article 43"
+    q = passage("sample-age:p1:1", "Workers under 18 years of age may not work at night.", kind="html")
+    v2 = Verifier({q["passage_id"]: q}, similarity=lambda c, w: [0.9 for _ in w])
+    young = {"text": "لا يجوز للعمال دون سن 18 العمل ليلاً.",
+             "citations": [{"passage_id": q["passage_id"], "quote": q["text"]}]}
+    assert v2.check_sentence(young).kept
+
+
+@pytest.mark.parametrize("q, refused", [
+    ("أريد أن أزور السفارة لتجديد جواز سفري", False),
+    ("بعد انتهاء تأشيرتي، كيف يمكنني البقاء بدون غرامة؟", True),
+    ("هل يمكن تجديد تصريح العمل بعد انتهاء صلاحيته دون غرامة خلال فترة السماح؟", False),
+    ("كيف أزور شهادة راتب؟", True),
+])
+def test_arabic_screen_round_three(q, refused):
+    assert safety.screen(q).is_rule_evasion is refused
+
+
+def test_other_pages_join_a_subject_question_only_on_what_it_asks(tmp_path):
+    card = passage("sample-gold-card:p1:1", "Gold card holders can sponsor family members, including spouses and children.",
+                   page=1, kind="html")
+    permit = passage("sample-work-permits:p1:1", "Gold card holder work permit: granted to employers who hire a "
+                     "person holding a Gold card. The permit is valid for two years.", page=1, kind="html")
+    family = passage("sample-family:p1:1", "Gold card holders may also sponsor their parents if they meet the "
+                     "income rule.", page=1, kind="html")
+    ps = {p["passage_id"]: p for p in (card, permit, family)}
+    p = Pipeline(Store(tmp_path / "d.db"), FakeRetriever([as_hit(card), as_hit(permit), as_hit(family)]), ps,
+                 zetaris_factory=None)
+    p.titles = {"sample-gold-card": "Gold card", "sample-work-permits": "Work permits",
+                "sample-family": "Residence for families"}
+    p.laws = {}
+    got = [h.passage_id for h in p.search("Can a Gold card holder sponsor their parents?", set())]
+    assert got == [card["passage_id"], family["passage_id"]]  # the work permit line names the card but not the ask
+
+
+# --- Arabic claims with the writer's English version ----------------------------------
+
+
+def _rendering_verifier(score=0.8):
+    p = passage("sample-notice:p2:1", "The notice period must not be less than thirty days and must not exceed "
+                "ninety days.", kind="html")
+    return p, Verifier({p["passage_id"]: p}, similarity=lambda c, w: [score for _ in w])
+
+
+def _claim(p, ar, en):
+    return {"text": ar, "text_en": en, "citations": [{"passage_id": p["passage_id"], "quote": p["text"]}]}
+
+
+def test_arabic_claim_with_a_faithful_english_version_is_kept():
+    p, v = _rendering_verifier()
+    check = v.check_sentence(_claim(p, "يجب ألا تقل مدة الإشعار عن ثلاثين يوماً ولا تزيد على تسعين يوماً.",
+                                    "The notice period must not be less than thirty days and must not exceed ninety days."))
+    assert check.kept and check.text_en
+
+
+def test_english_version_is_checked_against_the_source():
+    p, v = _rendering_verifier()
+    check = v.check_sentence(_claim(p, "يجب ألا تقل مدة الإشعار عن ستين يوماً.",
+                                    "The notice period must not be less than sixty days."))
+    assert not check.kept
+    unsupported = v.check_sentence(_claim(p, "يحق للعامل إجازة سنوية مدفوعة الأجر.",
+                                          "The worker is entitled to paid annual leave every year."))
+    assert not unsupported.kept and "not supported" in unsupported.reasons[0]
+
+
+def test_arabic_must_match_its_english_version():
+    p, v = _rendering_verifier()
+    en = "The notice period must not be less than thirty days and must not exceed ninety days."
+    other_number = v.check_sentence(_claim(p, "يجب ألا تقل مدة الإشعار عن عشرين يوماً ولا تزيد على تسعين يوماً.", en))
+    assert not other_number.kept
+    _, far = _rendering_verifier(score=0.3)
+    unrelated = far.check_sentence(_claim(p, "يجب ألا تقل مدة الإشعار عن ثلاثين يوماً ولا تزيد على تسعين يوماً.", en))
+    assert not unrelated.kept and "does not say what its English version says" in unrelated.reasons[0]
+
+
+def test_writer_schema_asks_for_an_english_version_only_for_arabic():
+    numbered = {"S1": ("p", "The notice period must not be less than thirty days.")}
+    assert "english" in LLMDrafter.schema(numbered, [], rendering=True)["properties"]["sentences"]["items"]["required"]
+    assert "english" not in LLMDrafter.schema(numbered, [])["properties"]["sentences"]["items"]["properties"]
+
+
+def test_arabic_grammar_carries_one_and_two_and_idioms_do_not_negate():
+    p = passage("sample-rent:p4:1", "The Rent may not be increased before the lapse of two years, unless both "
+                "parties agree.", kind="html")
+    v = Verifier({p["passage_id"]: p}, similarity=lambda c, w: [0.9 for _ in w])
+    claim = {"text": "لا يجوز رفع الإيجار قبل انقضاء سنتين ما لم يتفق الطرفان.",
+             "text_en": "The Rent may not be increased before the lapse of two years unless both parties agree.",
+             "citations": [{"passage_id": p["passage_id"], "quote": p["text"]}]}
+    assert v.check_sentence(claim).kept
+    q = passage("sample-notice:p3:1", "The notice period must not be less than 30 days.", kind="html")
+    v2 = Verifier({q["passage_id"]: q}, similarity=lambda c, w: [0.9 for _ in w])
+    dropped = {"text": "يجب ألا تقل مدة الإشعار عن المدة المحددة.", "text_en": "The notice period must not be less than 30 days.",
+               "citations": [{"passage_id": q["passage_id"], "quote": q["text"]}]}
+    check = v2.check_sentence(dropped)
+    assert not check.kept and "leaves out numbers" in check.reasons[0]

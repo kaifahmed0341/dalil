@@ -520,3 +520,18 @@ def test_an_arabic_claim_in_other_words_is_backed_by_the_rule_meaning():
     # A claim about something the data does not count still fails.
     assert support("المراكز مغلقة يوم الجمعة.", evidence) < 0.5
     assert all(r.meaning for r in RULES)
+
+
+def test_a_passage_unrelated_to_a_data_claim_is_taken_off_it(tmp_path, local):
+    rule = next(r for r in RULES if r.name == "tasheel_centres")
+    unrelated = {"passage_id": PASSAGES[2]["passage_id"],
+                 "quote": "A worker who resigns must give the employer written notice of at least thirty days."}
+    p = scripted(tmp_path, local, [{
+        "text": "There are 49 Tasheel service centres in the UAE.", "kind": "claim",
+        "citations": [unrelated, QUOTE, {"table": rule.table, "sql": rule.sql, "column": "centres", "value": "49"}]}])
+    rec = p.answer("How many Tasheel service centres are there? Where do I renew my card?")
+    cits = rec.draft[0]["citations"]
+    # The quote about service centres stays; the one about resigning is taken off.
+    assert [c.get("passage_id") for c in cits if "sql" not in c] == [QUOTE["passage_id"]]
+    verified = next(e for e in p.store.get(rec.id)["audit"] if e["kind"] == "verified")
+    assert verified["detail"]["unrelated_passages_dropped"] == 1

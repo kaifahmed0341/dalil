@@ -22,11 +22,14 @@ from dalil import lang, safety
 from dalil.draft import (FEE_CAVEAT, LAW_CAVEAT, WEAK_REFUSAL, Drafter, ExtractiveDrafter, caveat, data_claims,
                          refusal)
 from dalil.opendata import RULES, DataResult, match_rules, run_rules
-from dalil.retrieve import Hit, Searcher, make_retriever
+from dalil.retrieve import Hit, Searcher, make_retriever, tokenize
 from dalil.store import Store
 from dalil.hmem import Guidance, guidance
 from dalil.laws import is_scope_question, law_refs, scope_passages
-from dalil.subjects import names_subject, subject_docs
+from dalil.subjects import names_subject, subject_docs, title_terms
+
+# Words for the person who holds a service, not for what is asked about it.
+_ROLE_WORDS = frozenset(tokenize("holder holders owner owners applicant applicants resident residents person people"))
 from dalil.verify import Verifier, data_lookup, load_passages
 
 def cited_passages(check: dict[str, Any] | None) -> list[str]:
@@ -324,8 +327,13 @@ class Pipeline:
         if not subjects or not any(h.doc_id in subjects for h in hits):
             return hits
         names = [titles[d].split("|")[0] for d in subjects]
+        # What the question asks about the subject: its words, less the
+        # subject's own name and words for the person holding it.
+        asked = set(tokenize(question)) - set().union(*(title_terms(n) for n in names)) - _ROLE_WORDS \
+            - safety.subject_generic()
         return [h for h in hits if h.doc_id in subjects or h.doc_id in laws
-                or names_subject(f"{titles.get(h.doc_id, '')} {h.heading or ''} {h.text}", names)]
+                or (names_subject(f"{titles.get(h.doc_id, '')} {h.heading or ''} {h.text}", names)
+                    and set(tokenize(h.text)) & asked)]
 
     def _language(self, doc_id: str) -> str:
         for p in self.passages.values():
@@ -411,6 +419,7 @@ class Pipeline:
         draft = drop_internal_names(draft, data)
         internal = drafted - len(draft)
         draft, attached = attach_data(draft, data)
+        draft, unrelated = drop_unrelated_passages(draft, data)
         if client is None and any("sql" in c for s in draft for c in s.get("citations") or []):
             client, _ = self.data_source()
         subjects = {d: self.titles[d] for d in subject_docs(english or q, self.titles)
@@ -418,7 +427,7 @@ class Pipeline:
         verifier = Verifier(self.passages, data_lookup(client) if client else None,
                             allowed_sql=[d.sql for d in data], allowed_uncited=self.fixed_uncited,
                             allowed_passages=[h.passage_id for h in hits], titles=self.titles, laws=self.laws,
-                            similarity=getattr(self.retriever, "similarities", None), question=q,
+                            similarity=getattr(self.retriever, "similarities", None), question=english or q,
                             subjects=subjects,
                             data_facts={d.sql: " ".join(f for f in (d.fact, d.fact_ar, d.meaning) if f)
                                         for d in data if d.fact})
@@ -457,7 +466,8 @@ class Pipeline:
                                               if added else {}),
                                            **({"data_citations_attached": attached} if attached else {}),
                                            **({"repeats_dropped": repeats} if repeats else {}),
-                                           **({"internal_names_dropped": internal} if internal else {})})
+                                           **({"internal_names_dropped": internal} if internal else {}),
+                                           **({"unrelated_passages_dropped": unrelated} if unrelated else {})})
         status = "held" if check["status"] == "held" else "awaiting_review"
         retrieval = [asdict(h) for h in hits]
         data_dicts = [d.to_dict() for d in data]
@@ -569,6 +579,33 @@ def attach_data(draft: list[dict[str, Any]], data: list[DataResult]) -> tuple[li
             s = {**s, "citations": cits + new, "data_attached": len(new)}
         out.append(s)
     return out, added
+
+
+def drop_unrelated_passages(draft: list[dict[str, Any]], data: list[DataResult]
+                            ) -> tuple[list[dict[str, Any]], int]:
+    """On a claim that states a lookup's value and cites that lookup, keep a
+    passage citation only if its quote shares a subject word with the claim.
+
+    The model tends to add a passage to every data sentence, such as a page on
+    cancelling a visa next to "ICP handles 3763072 residence permit renewals".
+    The reviewer opens that source first, and it backs nothing in the sentence.
+    The data citation carries the claim; a passage that names the same subject
+    stays. Returns the new draft and how many citations were taken off."""
+    from dalil.retrieve import tokenize
+    sqls = {d.sql for d in data if d.rows}
+    dropped = 0
+    out = []
+    for s in draft:
+        cits = s.get("citations") or []
+        if s.get("kind", "claim") != "claim" or not any(c.get("sql") in sqls and _states(s, c) for c in cits):
+            out.append(s)
+            continue
+        words = {t for t in tokenize(str(s.get("text", ""))) if not t.isdigit()}
+        keep = [c for c in cits if "sql" in c
+                or words & {t for t in tokenize(str(c.get("quote") or "")) if not t.isdigit()}]
+        dropped += len(cits) - len(keep)
+        out.append({**s, "citations": keep} if len(keep) != len(cits) else s)
+    return out, dropped
 
 
 def _states(sentence: Mapping[str, Any], citation: Mapping[str, Any]) -> bool:

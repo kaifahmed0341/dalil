@@ -441,7 +441,9 @@ class LLMDrafter:
         lang.ARABIC: ("The question is in Arabic. Write at most four short claims, every one in Arabic, whatever "
                       "the language of the sources. When you cite an Arabic sentence from a law, copy its words "
                       "exactly instead of rewording them. Cite Arabic sentences when they say the same as English "
-                      "ones."),
+                      "ones. For each claim, first write \"english\": the claim in plain English, using the cited "
+                      "sentences' own words; then write \"text\": the same claim in Arabic, a faithful translation "
+                      "of the english, with the same numbers and the same negations."),
     }
     SCOPE_RULE = ("The question asks what a law covers or applies to. Answer from that law's own scope article, "
                   "marked [scope] below: say what it applies to and what it says it does not apply to, citing "
@@ -544,8 +546,11 @@ class LLMDrafter:
         return [{"role": "system", "content": system}, {"role": "user", "content": "\n".join(parts)}]
 
     @staticmethod
-    def schema(numbered: Mapping[str, tuple[str, str]], data: Sequence[DataResult]) -> dict[str, Any]:
-        """JSON schema that only admits the given sentence ids and queries."""
+    def schema(numbered: Mapping[str, tuple[str, str]], data: Sequence[DataResult],
+               rendering: bool = False) -> dict[str, Any]:
+        """JSON schema that only admits the given sentence ids and queries.
+        `rendering`: each sentence also carries "english", its English version,
+        for a question asked in another language."""
         options: list[dict[str, Any]] = []
         if numbered:
             options.append({"type": "object", "additionalProperties": False, "required": ["sentence"],
@@ -560,11 +565,16 @@ class LLMDrafter:
         if not options:
             raise ValueError("nothing to cite")
         cite = options[0] if len(options) == 1 else {"anyOf": options}
+        item: dict[str, Any] = {"text": {"type": "string", "minLength": 3},
+                                "citations": {"type": "array", "minItems": 1, "maxItems": 3, "items": cite}}
+        required = ["text", "citations"]
+        if rendering:
+            item = {"english": {"type": "string", "minLength": 3}, **item}
+            required = ["english", *required]
         return {"type": "object", "additionalProperties": False, "required": ["sentences"],
                 "properties": {"sentences": {"type": "array", "maxItems": 5, "items": {
-                    "type": "object", "additionalProperties": False, "required": ["text", "citations"],
-                    "properties": {"text": {"type": "string", "minLength": 3},
-                                   "citations": {"type": "array", "minItems": 1, "maxItems": 3, "items": cite}}}}}}
+                    "type": "object", "additionalProperties": False, "required": required,
+                    "properties": item}}}}
 
     def translate(self, question: str) -> str:
         """The question in English, for searching sources that are mostly in
@@ -608,8 +618,9 @@ class LLMDrafter:
         # do not cover the question, so refuse rather than ask the model.
         if not has_data and (not numbered or weak(question, hits)):
             return [refusal()]
+        rendering = lang.language(question) != lang.ENGLISH
         raw = self.complete(self.messages(question, hits, data, notes, numbered, english=english),
-                            self.schema(numbered, data))
+                            self.schema(numbered, data, rendering=rendering))
         try:
             parsed = json.loads(raw)
         except ValueError as e:
@@ -618,6 +629,7 @@ class LLMDrafter:
         out: list[dict[str, Any]] = []
         for s in (parsed.get("sentences") or [])[:5]:
             text = str(s.get("text") or "").strip()
+            text_en = str(s.get("english") or "").strip()
             cits = []
             for c in s.get("citations") or []:
                 if not isinstance(c, dict):
@@ -634,7 +646,8 @@ class LLMDrafter:
                     # own, never reaches the checker as a usable citation.
                     cits.append({"passage_id": "unknown:not-a-given-sentence", "quote": ""})
             if text and text.casefold() not in {s["text"].casefold() for s in out}:
-                out.append({"text": text, "kind": "claim", "citations": cits})
+                out.append({"text": text, "kind": "claim", "citations": cits,
+                            **({"text_en": text_en} if text_en else {})})
         if not out:
             return [refusal()]
         # Judge the fee caveat on what the claims cite, which the checker
