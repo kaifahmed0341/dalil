@@ -222,9 +222,20 @@ _SOFT_BACKING = {"غير": frozenset({"non"}), "دون": frozenset({"under", "be
 _DUN_AMOUNT = re.compile(r"دون\s+(?:سن|عمر|[\d\u0660-\u0669])")
 
 
-# Arabic phrases built on a negation word that do not negate: "ما لم"
-# (unless), "لا سيما" (especially), "لا بد" (must).
-_AR_IDIOMS = re.compile(r"ما\s+لم|لا\s*سي[ّ]?ما|لا\s+بد|لابد")
+# Phrases built on a negation word that do not negate: "ما لم" (unless),
+# "لا سيما" (especially), "لا بد" (must), and bounds, which say the same as
+# "at least" or "at most": "لا يقل عن", "not less than", "no more than".
+_AR_IDIOMS = re.compile(
+    r"ما\s+لم|لا\s*سي[ّ]?ما|لا\s+بد|لابد|[لأ]ل?ا\s+[يت](?:قل|زيد|تجاوز)\w*|[لأ]ل?ا\s+تتجاوز"
+    r"|\b(?:not|no)\s+(?:be\s+)?(?:less|more|fewer|later|earlier|longer|shorter)\s+than\b"
+    r"|\bnot\s+(?:be\s+)?(?:exceed|exceeding)\b",
+    re.IGNORECASE)
+# A leading "According to Article 43 of the Labour Law," or "وفقاً للمادة 43
+# من قانون العمل،": who says it, not what is said.
+_ATTRIBUTION = re.compile(
+    r"^\s*(?:(?:according\s+to|under|as\s+per|per)\b[^,]{0,120},|(?:وفق[اًا]*|طبق[اًا]*|بموجب|حسب)\s[^،,]{0,120}[،,])\s*",
+    re.IGNORECASE)
+_LATIN_WORD = re.compile(r"[A-Za-z][A-Za-z'-]+")
 
 
 def _without_idioms(text: str) -> str:
@@ -558,15 +569,22 @@ class Verifier:
         against a whole legal paragraph."""
         text, en = result.text, result.text_en
         backed = set().union(*(numbers(c.evidence) for c in result.citations))
+        # Latin words in the Arabic, such as "ICP", must come from the English
+        # version or the sources; a stray "acordo" is a slip of the model.
+        known = {w.casefold() for w in _LATIN_WORD.findall(f"{en} {evidence}")}
+        stray = sorted({w for w in _LATIN_WORD.findall(text) if w.casefold() not in known})
         titled = set().union(*(numbers(c.title) for c in result.citations)) & law_numbers(en)
         missing = sorted(numbers(en) - backed - titled, key=lambda n: (len(n), n))
         problems = []
+        if stray:
+            problems.append("it has words in another language that neither its sources nor its English version "
+                            "have: " + ", ".join(stray))
         if missing:
             problems.append("its English version has numbers not in any cited source: " + ", ".join(missing))
         share = support(en, evidence)
         if share < SUPPORT_MIN:
             problems.append(f"its English version is not supported by its sources (key words found: {share:.0%})")
-        en_neg = _negations(_words(_LAW_NUMBER.sub(" ", en)))
+        en_neg = _negations(_words(_without_idioms(_LAW_NUMBER.sub(" ", en))))
         if en_neg and not _negations(_words(evidence)):
             problems.append("its English version adds a negation its sources do not have: " + ", ".join(sorted(en_neg)))
         # Every number of the English version must be in the claim too. One and
@@ -581,7 +599,8 @@ class Verifier:
         if bool(ar_neg) != bool(en_neg):
             problems.append("it negates where its English version does not, or the other way round")
         if not problems:
-            sims = (self.similarity(text, [en]) or []) if self.similarity else []
+            sims = (self.similarity(_ATTRIBUTION.sub("", text), [_ATTRIBUTION.sub("", en)]) or []) \
+                if self.similarity else []
             if not sims:
                 problems.append("no model is available to compare it with its English version")
             elif sims[0] < RENDERING_MIN:
