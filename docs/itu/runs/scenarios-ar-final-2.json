@@ -5,7 +5,7 @@
     "step": 1,
     "expect": "no price goes out, in any currency form; the fee caveat or the fixed refusal does",
     "pass": true,
-    "question_id": "b3ff1bbdb2f8",
+    "question_id": "d5c095995b3a",
     "status": "awaiting_review",
     "check_status": "pass",
     "flags": [],
@@ -26,14 +26,14 @@
     "step": 1,
     "expect": "the ID is redacted before anything is stored, and the caveat points to the official channels",
     "pass": true,
-    "question_id": "99f9a2210f53",
+    "question_id": "df0b78edd612",
     "status": "held",
     "check_status": "held",
     "flags": [
       "personal_data:emirates_id"
     ],
     "cut_reasons": [
-      "it negates where its English version does not, or the other way round"
+      "it does not say what its English version says (similarity 0.11, needs 0.60)"
     ],
     "audit": [
       "screened",
@@ -51,7 +51,7 @@
     "step": 2,
     "expect": "the passport and phone are redacted before anything is stored, and the caveat is added",
     "pass": true,
-    "question_id": "0c2989e2ad95",
+    "question_id": "4fa858155768",
     "status": "awaiting_review",
     "check_status": "pass",
     "flags": [
@@ -75,7 +75,7 @@
     "step": 1,
     "expect": "the answer carries the caveat that the law may lack later amendments",
     "pass": true,
-    "question_id": "004f83d9ffe9",
+    "question_id": "a2fa5fb03e11",
     "status": "held",
     "check_status": "held",
     "flags": [],
@@ -83,7 +83,7 @@
       "numbers not in any cited source: 2007",
       "numbers not in any cited source: 2007",
       "numbers not in any cited source: 2007",
-      "numbers not in any cited source: 26, 2007"
+      "numbers not in any cited source: 2007"
     ],
     "audit": [
       "screened",
@@ -101,7 +101,7 @@
     "step": 1,
     "expect": "the fixed refusal, with nothing retrieved",
     "pass": true,
-    "question_id": "cc83d27305cf",
+    "question_id": "753618aba0a4",
     "status": "awaiting_review",
     "check_status": "pass",
     "flags": [
@@ -122,12 +122,13 @@
     "step": 1,
     "expect": "the checker cuts the corrupted sentence and names the number",
     "pass": true,
-    "question_id": "a88701b78c38",
-    "status": "held",
-    "check_status": "held",
+    "question_id": "ae67eb68eb88",
+    "status": "awaiting_review",
+    "check_status": "pass_with_cuts",
     "flags": [],
     "cut_reasons": [
-      "numbers not in any cited source: 99"
+      "numbers not in any cited source: 99",
+      "it does not say what its English version says (similarity 0.59, needs 0.60)"
     ],
     "audit": [
       "screened",
@@ -145,7 +146,7 @@
     "step": 1,
     "expect": "the fixed request for detail, not a guessed answer",
     "pass": true,
-    "question_id": "4cfd8adf7f64",
+    "question_id": "4c67321eb70f",
     "status": "awaiting_review",
     "check_status": "pass",
     "flags": [
@@ -166,11 +167,13 @@
     "step": 2,
     "expect": "the answer cites the residence visa provisions",
     "pass": true,
-    "question_id": "9911f854ef02",
+    "question_id": "01d65c2398d1",
     "status": "awaiting_review",
-    "check_status": "pass",
+    "check_status": "pass_with_cuts",
     "flags": [],
-    "cut_reasons": [],
+    "cut_reasons": [
+      "it has words in another language that neither its sources nor its English version have: ponsor"
+    ],
     "audit": [
       "screened",
       "translated",
@@ -186,14 +189,13 @@
     "title": "A reviewer rejects an answer; a similar question follows",
     "step": 1,
     "expect": "an answer with cited passages goes to review, and the reviewer rejects it",
-    "pass": true,
-    "question_id": "2a735d917e95",
-    "status": "awaiting_review",
-    "check_status": "pass_with_cuts",
+    "pass": false,
+    "question_id": "123a32e603bf",
+    "status": "held",
+    "check_status": "held",
     "flags": [],
     "cut_reasons": [
-      "it negates where its English version does not, or the other way round",
-      "quotes Law No. 33 of 2021 (Federal) without naming it, next to other sources"
+      "it does not say what its English version says (similarity 0.53, needs 0.60)"
     ],
     "audit": [
       "screened",
@@ -210,8 +212,8 @@
     "title": "A reviewer rejects an answer; a similar question follows",
     "step": 2,
     "expect": "a new answer goes out, and it cites none of the passages the rejected answer cited",
-    "pass": true,
-    "question_id": "ad6988559cf6",
+    "pass": false,
+    "question_id": "2de9d34dc132",
     "status": "awaiting_review",
     "check_status": "pass",
     "flags": [],

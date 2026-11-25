@@ -2,15 +2,15 @@
 
 ## The ITU final version, 25 November 2026
 
-Measured on an Apple M3 Pro laptop with 18 GB of memory, both models on its GPU through Metal, fully offline, open data on the local database. "Main" is commit `49e8e0e`, the code in the 25 November video, on its own 1,024 passages; "final" is this branch at `dfc704f` (the 41 questions, the scenarios and the open data) and `59bd4f9` (the rest; the one change between them gates open-data lookups, which none of those questions trigger), on 1,030 passages. NVIDIA Nemotron 3 Nano 4B drafted every answer. The reports are in [itu/runs/](itu/runs/); they hold ids, statuses and document ids, no document text.
+Measured on an Apple M3 Pro laptop with 18 GB of memory, both models on its GPU through Metal, fully offline, open data on the local database. "Main" is commit `49e8e0e`, the code in the 25 November video, on its own 1,024 passages; "final" is this branch at `dfc704f` (the 41 questions, the scenarios and the open data) and `59bd4f9` (the rest; the one change between them gates open-data lookups, which none of those questions trigger), on 1,030 passages, except the seven ITU scenarios, rerun at `20f484a` after an orchestrator check found Arabic S3 failing at `6071285`. NVIDIA Nemotron 3 Nano 4B drafted every answer. The reports are in [itu/runs/](itu/runs/); they hold ids, statuses and document ids, no document text.
 
 | | Main | Final |
 |---|---|---|
 | Data-protection question cites Article 2(2), 10 runs, English | 1 | 10 |
 | Same, Arabic, quoting the lead-in with the list | 0 (it quoted item (b) alone) | 10 |
 | A Dubai law sentence kept without saying it is the Dubai law, 10 runs | 10 | 0 |
-| Seven ITU scenarios, English | 10 of 10, twice | 10 of 10, twice |
-| Seven ITU scenarios, Arabic, 5 runs | not measured | 5 of 5 on every one of the ten steps |
+| Seven ITU scenarios, English | 10 of 10, twice | 10 of 10 |
+| Seven ITU scenarios, Arabic, 10 runs | not measured | 8 steps 10 of 10; S7 step 1 9 of 10, step 2 8 of 10 |
 | S7 follow-up answered from other passages, 10 runs | English 10 | English 10, Arabic 10 |
 | S7 replaying the recording's rejection, 10 runs | 10 | 10 |
 | Kept claims citing an expected document, 41 questions | 113 of 117 (0.966), 40 questions | 119 of 121 (0.983) |
@@ -55,9 +55,13 @@ Measured on an Apple M3 Pro laptop with 18 GB of memory, both models on its GPU 
 
 The model's writing is the whole cost: it runs at about 29 tokens a second on this laptop, and the prompt is mostly served from llama-server's cache. Flash attention is already on and every layer is on the GPU, so threads, batch size and mlock change nothing in steady use. Asking for compact JSON changed the answers and was not kept. The 13 to 15 seconds measured earlier were with other sessions on the same model servers. An Arabic question adds one short call for its English translation and writes each claim twice.
 
+### Arabic scenarios at `20f484a`
+
+At `6071285`, Arabic S3 got the fixed refusal in 2 of 3 runs. The audit showed why: an Arabic reply carries an English version of each claim and ran to 670 tokens against a 700 cap, so a longer one was cut off mid-JSON, and the fallback, which matches words, could not quote English sources for an Arabic question. Arabic replies now get twice the cap, and a reply that is not JSON is asked for once more. Over 10 runs at `20f484a`: S1, S2 (both steps), S3, S4, S5, S6 (both steps) 10 of 10; S7 step 1 9 of 10 (a correct claim at similarity 0.53 was cut, so nothing went to the reviewer to reject), S7 step 2 8 of 10 (one miss follows from that, one held for a negation mismatch). Runs: 10, 8, 10, 10, 9, 10, 10, 10, 10, 10 of 10 steps.
+
 ### What is still wrong
 
-c10, "Which medical conditions make someone unfit for a UAE residence visa?", keeps two true sentences from the family-visa page about medical tests for dependents, which is not what was asked. The Arabic S5 step passes in some runs with nothing sent: when the writer drafted a single claim, the scenario corrupts it and the checker cuts it, so the answer is held.
+c10, "Which medical conditions make someone unfit for a UAE residence visa?", keeps two true sentences from the family-visa page about medical tests for dependents, which is not what was asked. Arabic S7 misses 1 to 2 runs in 10, as above. The Arabic S5 step passes in some runs with nothing sent: when the writer drafted a single claim, the scenario corrupts it and the checker cuts it, so the answer is held.
 
 ## Earlier measurements
 

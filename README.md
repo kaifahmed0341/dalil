@@ -122,8 +122,8 @@ On the laptop below, with Nemotron 3 Nano 4B drafting, against the code shown in
 | | Before | Now |
 |---|---|---|
 | Data-protection question cites Article 2(2), the exclusion, 10 runs | 1 | 10, in English and in Arabic |
-| ITU scenarios, English | 10 of 10 | 10 of 10, twice |
-| ITU scenarios, Arabic, 5 runs | not measured | 5 of 5 on every step |
+| ITU scenarios, English | 10 of 10 | 10 of 10 |
+| ITU scenarios, Arabic, 10 runs | not measured | 8 of the 10 steps 10 of 10; S7's two steps 9 and 8 of 10 |
 | Kept claims citing an expected document, 41 questions | 113 of 117 (0.966), 40 questions | 119 of 121 (0.983) |
 | "Can a Golden Visa holder sponsor their parents?", answers drawing only on the Golden Visa page, 10 runs | 0 | 10 |
 | Numbers questions answered from the local open data, 70 runs | not available | 70 |
