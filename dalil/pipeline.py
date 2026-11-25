@@ -385,6 +385,7 @@ class Pipeline:
         draft = drop_internal_names(draft, data)
         internal = drafted - len(draft)
         draft, attached = attach_data(draft, data)
+        draft, unrelated = drop_unrelated_passages(draft, data)
         if client is None and any("sql" in c for s in draft for c in s.get("citations") or []):
             client, _ = self.data_source()
         subjects = {d: self.titles[d] for d in subject_docs(english or q, self.titles)
@@ -431,7 +432,8 @@ class Pipeline:
                                               if added else {}),
                                            **({"data_citations_attached": attached} if attached else {}),
                                            **({"repeats_dropped": repeats} if repeats else {}),
-                                           **({"internal_names_dropped": internal} if internal else {})})
+                                           **({"internal_names_dropped": internal} if internal else {}),
+                                           **({"unrelated_passages_dropped": unrelated} if unrelated else {})})
         status = "held" if check["status"] == "held" else "awaiting_review"
         retrieval = [asdict(h) for h in hits]
         data_dicts = [d.to_dict() for d in data]
@@ -543,6 +545,33 @@ def attach_data(draft: list[dict[str, Any]], data: list[DataResult]) -> tuple[li
             s = {**s, "citations": cits + new, "data_attached": len(new)}
         out.append(s)
     return out, added
+
+
+def drop_unrelated_passages(draft: list[dict[str, Any]], data: list[DataResult]
+                            ) -> tuple[list[dict[str, Any]], int]:
+    """On a claim that states a lookup's value and cites that lookup, keep a
+    passage citation only if its quote shares a subject word with the claim.
+
+    The model tends to add a passage to every data sentence, such as a page on
+    cancelling a visa next to "ICP handles 3763072 residence permit renewals".
+    The reviewer opens that source first, and it backs nothing in the sentence.
+    The data citation carries the claim; a passage that names the same subject
+    stays. Returns the new draft and how many citations were taken off."""
+    from dalil.retrieve import tokenize
+    sqls = {d.sql for d in data if d.rows}
+    dropped = 0
+    out = []
+    for s in draft:
+        cits = s.get("citations") or []
+        if s.get("kind", "claim") != "claim" or not any(c.get("sql") in sqls and _states(s, c) for c in cits):
+            out.append(s)
+            continue
+        words = {t for t in tokenize(str(s.get("text", ""))) if not t.isdigit()}
+        keep = [c for c in cits if "sql" in c
+                or words & {t for t in tokenize(str(c.get("quote") or "")) if not t.isdigit()}]
+        dropped += len(cits) - len(keep)
+        out.append({**s, "citations": keep} if len(keep) != len(cits) else s)
+    return out, dropped
 
 
 def _states(sentence: Mapping[str, Any], citation: Mapping[str, Any]) -> bool:

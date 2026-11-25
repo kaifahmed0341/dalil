@@ -492,6 +492,15 @@ class Verifier:
                 result.kept = False
                 result.reasons.append("data values come from different rows")
         quotes = [c.evidence for c in result.citations if c.ok and c.doc_id]
+        backing = [c.evidence for c in result.citations if c.ok and c.rows]
+        if result.kept and backing and not quotes and self.data_facts:
+            # Backed by open data alone: the claim's key words must mostly be in
+            # what the lookup counts (the rule's fact and meaning), as a reworded
+            # passage claim must be in its quotes.
+            share = support(text, " ".join(backing))
+            if share < SUPPORT_MIN:
+                result.kept = False
+                result.reasons.append(f"claim is not supported by its data (key words found: {share:.0%})")
         if result.kept and quotes:
             # A drafter may reword its sources. The claim's key words must mostly
             # be in them, and it may not add a negation they lack.
