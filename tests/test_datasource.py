@@ -480,3 +480,14 @@ def test_a_claim_naming_a_table_is_dropped(tmp_path, local):
     assert [s["text"] for s in rec.check["sentences"]] == [first]
     verified = next(e for e in p.store.get(rec.id)["audit"] if e["kind"] == "verified")
     assert verified["detail"]["internal_names_dropped"] == 1
+
+
+def test_an_english_fact_from_the_fallback_is_said_in_arabic(tmp_path, local):
+    from dalil.draft import data_claims
+    from dalil.opendata import match_rules, run_rules
+    q = "كم عدد بطاقات الهوية الإماراتية التي تجددها الهيئة في السنة؟"
+    data = run_rules(match_rules(q), lambda sql: local.sql(sql, limit=200).dicts(), source="local")
+    p = scripted(tmp_path, local, data_claims(data))  # what the extractive drafter writes: the English fact
+    rec = p.answer(q)
+    kept = [s["text"] for s in rec.check["sentences"] if s["kept"]]
+    assert kept and all("5856085" in t and "الهوية" in t for t in kept if any(ch.isdigit() for ch in t)), kept
