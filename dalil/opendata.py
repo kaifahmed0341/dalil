@@ -117,7 +117,7 @@ RULES: tuple[DataRule, ...] = (
         "MOHRE open data records {solved} solved private-sector labour complaints in {year}, "
         "counting each emirate once.",
         "تسجل البيانات المفتوحة لوزارة الموارد البشرية والتوطين {solved} شكوى عمالية محلولة في القطاع الخاص "
-        "في عام {year}، مع احتساب كل إمارة مرة واحدة.",
+        "في عام {year}، مع احتساب كل إمارة دون تكرار.",
         "The number of private-sector labour complaints that MOHRE solves in a year. عدد الشكاوى العمالية في "
         "القطاع الخاص التي تحلها وزارة الموارد البشرية والتوطين في السنة.",
     ),
