@@ -9,7 +9,7 @@ Built for the Open Agent Hackathon 2026, Track 02, "The Agent That Can Explain W
 1. You ask a question about a UAE government service.
 2. Dalil screens it. Emirates ID, passport, phone and email details are redacted before anything is stored, and requests to get around the rules get a refusal. Reviewers' names and notes are redacted the same way.
 3. It recalls past reviews from H-MEM, Meterless's memory engine. For a question that shares most of its key words with an earlier one, it leaves out the passages a reviewer rejected there, unless an approved answer to a similar question used them.
-4. It searches 1,024 passages from 45 official documents with BM25 fused with NVIDIA Nemotron-3-Embed-1B embeddings, and runs fixed open-data queries through Zetaris when the question needs numbers.
+4. It searches 1,024 passages from 45 official documents with BM25 fused with NVIDIA Nemotron-3-Embed-1B embeddings, and runs fixed open-data queries when the question needs numbers: through Zetaris when it is configured and answers, otherwise on a local SQLite copy of the same tables.
 5. NVIDIA Nemotron drafts an answer. The model sees the sources as numbered sentences and may only point at those ids or at the queries Dalil ran, enforced by a JSON schema; Dalil then writes each quote itself, so quotes are exact. If the model is unavailable, an extractive drafter quotes source sentences instead, and the audit trail records which one ran.
 6. A checker tests every citation. A quote must appear word for word in a passage the drafter was given. Every number in a sentence, in digits or words, must appear in its evidence, and values from open data must come from one row of a rerun query. Most of a claim's key words must be in its sources, and it may not add a negation they lack. Sentences that fail are cut, and an answer that loses too much is held. The checker cannot judge meaning, so the reviewer reads every answer.
 7. A reviewer sees the answer, the exact passage behind each citation highlighted on its page, the sentences that were cut and why, and the audit trail. Nothing goes out until they approve it.
@@ -24,8 +24,8 @@ flowchart LR
     Q[Resident question] --> S[Screen: redact personal data,<br/>refuse rule-dodging]
     S --> R[Recall similar reviews<br/>Meterless H-MEM]
     R --> F[Search 1,024 passages<br/>BM25]
-    S --> Z[Fixed open-data queries<br/>Zetaris]
-    F --> D[Draft: every sentence cites<br/>a passage or a Zetaris query]
+    S --> Z[Fixed open-data queries<br/>Zetaris or local SQLite]
+    F --> D[Draft: every sentence cites<br/>a passage or an open-data query]
     Z --> D
     R -. reviewer notes .-> D
     D --> C[Checker: quotes word for word,<br/>numbers in evidence, queries rerun]
@@ -45,7 +45,7 @@ flowchart LR
 
 ## Run it
 
-You need Python 3.13 with [uv](https://docs.astral.sh/uv/), Node 22.7 or later for the H-MEM bridge, and a Zetaris instance. This was built against Zetaris's free local version, 2.4.3.1.
+You need Python 3.13 with [uv](https://docs.astral.sh/uv/), Node 22.7 or later for the H-MEM bridge, and optionally a Zetaris instance. This was built against Zetaris's free local version, 2.4.3.1. Without Zetaris, leave out the three Zetaris lines below: the app loads the open data in `data/open/` into an in-memory SQLite database at start and runs the same queries there. `DALIL_OPEN_DATA` picks the source (`auto`, the default, `zetaris`, `local` or `off`), and `uv run python scripts/check_open_data.py` checks whichever one is in use.
 
 ```bash
 uv sync
@@ -94,7 +94,7 @@ Dalil's passages are stored instead of the output of ITU's chunker, because that
 
 | Part | What |
 |---|---|
-| Zetaris | Federated SQL over the documents, pages, passages and four Bayanat open datasets, all in one Lightning database. Citations to open data are Zetaris queries that the checker reruns |
+| Zetaris | Federated SQL over the documents, pages, passages and four Bayanat open datasets, all in one Lightning database. Citations to open data are Zetaris queries that the checker reruns. Without Zetaris, the same tables and queries run on SQLite from the Python standard library (`dalil/datasource.py`) |
 | Meterless | H-MEM, vendored unchanged from Meterless's reference implementation, keeps approved answers and reviewers' rejections with their provenance in its append-only trust ledger |
 | NVIDIA | NVIDIA Nemotron-3-Embed-1B embeds the passages for dense retrieval, fused with BM25: it lifts recall at top 3 on the ten test questions from 9 to 10. NVIDIA Nemotron 3 Nano 4B drafts the answers, running locally through llama.cpp from NVIDIA's own GGUF, under the NVIDIA Nemotron Open Model License. The drafter speaks the OpenAI-compatible API, so NVIDIA's hosted endpoint can replace the local server by setting `DALIL_LLM_URL`, `DALIL_LLM_KEY` and `DALIL_LLM_MODEL`; that path has not been tried yet |
 | Claude Code | Wrote the code; see [docs/tool-log.md](docs/tool-log.md) |
