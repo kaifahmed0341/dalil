@@ -405,3 +405,17 @@ def test_writer_gets_the_english_question_and_the_arabic_original():
     assert "<question>Does the records law cover public bodies?</question>" in m[1]["content"]
     assert f"<asked_in_arabic>{q}</asked_in_arabic>" in m[1]["content"]
     assert d.LANGUAGE_RULES["ar"] in m[0]["content"]
+
+
+def test_review_memory_matches_arabic_phrasings_in_english():
+    from dalil.hmem import guidance
+    memories = [{"id": "m1", "kind": "rejected", "question": "كم مدة الإشعار عند الاستقالة؟",
+                 "passage_ids": ["p-probation"], "note": "probation rules"}]
+    english = {"كم مدة الإشعار عند الاستقالة؟": "How much notice must I give when I resign?",
+               "إذا استقلت، كم يوماً من الإشعار يجب أن أعطي؟": "If I resign, how many days of notice must I give?"}
+    q = "إذا استقلت، كم يوماً من الإشعار يجب أن أعطي؟"
+    assert guidance(q, memories).avoid == set()  # the Arabic words alone share too little
+    g = guidance(q, memories, english=english.__getitem__)
+    assert g.avoid == {"p-probation"} and g.notes == ["probation rules"]
+    # English questions are matched by their own words, with no translation.
+    assert guidance("How long is maternity leave?", memories, english=lambda t: 1 / 0).avoid == set()

@@ -128,7 +128,7 @@ class Pipeline:
         self._zetaris = client
         return client, ""
 
-    def recall(self, qid: str, question: str) -> Guidance:
+    def recall(self, qid: str, question: str, english: str = "") -> Guidance:
         """Reviews of similar questions, from the review memory, and log what was used."""
         if self.memory is None:
             return Guidance()
@@ -136,12 +136,31 @@ class Pipeline:
         if recalled is None:
             self.store.event(qid, "recalled", {"available": False})
             return Guidance()
-        g = guidance(question, recalled.get("memories") or [])
+        g = guidance(question, recalled.get("memories") or [], english=self._to_english(question, english))
         self.store.event(qid, "recalled", {
             "available": True, "similar_reviews": g.similar,
             "passages_left_out": sorted(g.avoid), "notes": len(g.notes),
         })
         return g
+
+    def _to_english(self, question: str, english: str) -> Callable[[str], str] | None:
+        """English for the review memory's question matching: this question's
+        translation, English text unchanged, others translated once and cached."""
+        translate = self.translator()
+        if translate is None:
+            return None
+        cache: dict[str, str] = getattr(self, "_english_cache", {})
+        self._english_cache = cache
+        if english:
+            cache[question] = english
+
+        def to_english(text: str) -> str:
+            if lang.language(text) == lang.ENGLISH:
+                return text
+            if text not in cache:
+                cache[text] = translate(text)
+            return cache[text]
+        return to_english
 
     def translator(self) -> Callable[[str], str] | None:
         """The model's translate(), when the drafter has a model."""
@@ -254,8 +273,8 @@ class Pipeline:
             if screened.has_personal_data:
                 draft.append(caveat(safety.PERSONAL_DATA_CAVEAT))
         else:
-            past = self.recall(qid, q)
             english = self.english_query(qid, q)
+            past = self.recall(qid, q, english)
             hits = self.search(q, past.avoid, english)
             self.store.event(qid, "retrieved", {
                 "k": self.k, "hits": len(hits),
