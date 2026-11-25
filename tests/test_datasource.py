@@ -263,3 +263,14 @@ def test_a_source_that_stops_answering_is_dropped_and_resolved_again(tmp_path, l
     assert isinstance(p.data_source()[0], FakeZetaris)
     p._zetaris.fail = True
     assert p.data_source_status()["kind"] == "local"
+
+
+def test_a_year_from_the_same_rerun_row_backs_the_sentence(local):
+    rule = next(r for r in RULES if r.name == "medical_fitness")
+    cit = {"table": rule.table, "sql": rule.sql, "column": "exams", "value": "1424313"}
+    v = Verifier({}, data_lookup(local), allowed_sql=[rule.sql])
+    ok = v.check_answer([{"text": "In 2025, EHS carried out 1424313 exams.", "citations": [cit]}])
+    assert ok.status == "pass", ok.to_dict()
+    # A number in no returned row is still cut.
+    bad = v.check_answer([{"text": "In 2024, EHS carried out 1424313 exams.", "citations": [cit]}])
+    assert bad.status == "held" and "2024" in bad.sentences[0].reasons[0]

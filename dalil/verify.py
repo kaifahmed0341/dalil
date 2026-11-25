@@ -16,7 +16,8 @@ A sentence is kept only if all of these hold:
    a column, and rerunning it through `data_lookup` returns the value in
    that column.
 4. Every number in the sentence appears in one of its verified quotes, the
-   heading of a cited passage, or a data value. A model that writes "AED 1,500" over a quote saying
+   heading of a cited passage, or a data value: the cited value or another
+   value in the same row the rerun returned. A model that writes "AED 1,500" over a quote saying
    "AED 1,000" loses the sentence.
 
 "Word for word" forgives only what a copy-paste or a line break changes:
@@ -302,7 +303,13 @@ class Verifier:
         matched = frozenset(i for i, row in enumerate(rows)
                             if row.get(column) is not None and want == fold(str(row[column]))[0])
         if matched:
-            return CitationCheck(True, "value returned by the query", cit, evidence=str(value), rows=matched)
+            # The rerun returned the whole row, so its other values are verified
+            # too: "1424313 exams in 2025" may cite the count alone when the year
+            # sits in the same returned row. Only rows holding the cited value count.
+            same_row = [str(rows[i][k]) for i in sorted(matched) for k in rows[i]
+                        if k != column and rows[i][k] is not None]
+            return CitationCheck(True, "value returned by the query", cit,
+                                 evidence=" ".join([str(value), *same_row]), rows=matched)
         return CitationCheck(False, f"query did not return the cited value in column {column!r}", cit)
 
     def check_sentence(self, sentence: Mapping[str, Any]) -> SentenceCheck:
