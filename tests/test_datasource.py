@@ -442,3 +442,27 @@ def test_a_claim_written_twice_is_checked_once(tmp_path, local):
     p = scripted(tmp_path, local, [{"text": text, "kind": "claim", "citations": [QUOTE]}] * 3)
     rec = p.answer("How do I renew my card?")
     assert [s["text"] for s in rec.check["sentences"]].count(text) == 1
+
+
+def test_a_claim_that_only_repeats_a_stated_value_is_dropped(tmp_path, local):
+    first = "In 2025, Emirates Health Services carried out 1424313 medical fitness exams for residency visas."
+    p = scripted(tmp_path, local, [
+        {"text": first, "kind": "claim", "citations": [QUOTE]},
+        {"text": "The data value is 1424313.", "kind": "claim", "citations": [QUOTE]},
+        {"text": "The number of exams is 1424313.", "kind": "claim", "citations": [QUOTE]},
+    ])
+    rec = p.answer("How many medical fitness exams for residency visas does Emirates Health Services carry out?")
+    assert [s["text"] for s in rec.check["sentences"]] == [first]
+    assert rec.status == "awaiting_review"
+    verified = next(e for e in p.store.get(rec.id)["audit"] if e["kind"] == "verified")
+    assert verified["detail"]["repeats_dropped"] == 2
+
+
+def test_a_claim_with_a_new_number_is_not_a_repeat(tmp_path, local):
+    p = scripted(tmp_path, local, [
+        {"text": "Emirates Health Services carried out 1424313 medical fitness exams.", "kind": "claim",
+         "citations": [QUOTE]},
+        {"text": "Of the 1424313 exams, 300 were by website.", "kind": "claim", "citations": [QUOTE]},
+    ])
+    rec = p.answer("How many medical fitness exams for residency visas does Emirates Health Services carry out?")
+    assert len(rec.check["sentences"]) == 2
