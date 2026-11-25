@@ -98,8 +98,8 @@ def law_ref(doc_id: str, title: str, topic: str = "") -> LawRef | None:
         topic_folded = _plain(topic).casefold()
         jurisdiction = next((j for j, words in JURISDICTIONS.items() if any(w in topic_folded for w in words)), "")
     # A short name the manifest topic gives the law itself: "PDPL Federal Decree-Law 45".
-    aliases = tuple(sorted(set(re.findall(r"\b([A-Z]{3,6})\b(?=\s+(?:federal\s+)?(?:decree|law))", topic or "",
-                                          flags=re.IGNORECASE)) - {"UAE", "AED", "ICP"}))
+    aliases = tuple(sorted(set(re.findall(r"\b((?-i:[A-Z]{3,6}))\b(?=\s+(?:federal\s+)?(?:decree|law))",
+                                          topic or "", flags=re.IGNORECASE)) - {"UAE", "AED", "ICP"}))
     return LawRef(doc_id, title, jurisdiction, number.group(1), year.group(1), aliases)
 
 
@@ -111,7 +111,13 @@ def law_refs(rows: Iterable[Mapping[str, str]]) -> dict[str, LawRef]:
         ref = law_ref(doc_id(r["file"]), r.get("title", ""), r.get("topic", ""))
         if ref:
             out[ref.doc_id] = ref
-    return out
+    # The same law in two languages shares its short names: the Arabic PDPL's
+    # topic says "PDPL", and the English one is the same law.
+    by_key: dict[tuple[str, str, str], set[str]] = {}
+    for ref in out.values():
+        by_key.setdefault(ref.key, set()).update(ref.aliases)
+    from dataclasses import replace
+    return {d: replace(ref, aliases=tuple(sorted(by_key[ref.key]))) for d, ref in out.items()}
 
 
 _LAW_EN = r"(?:law|decree|decree-law|decree\s+by\s+law|act|legislation)"

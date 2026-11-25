@@ -502,3 +502,79 @@ def test_page_number_is_stripped_only_when_it_is_the_page_and_never_when_joining
     listed = "The following apply:\n6 records are kept by the keeper for the period the law sets."
     out = units(listed, pdf=True, page=6)
     assert " ".join(out[0].split()) in " ".join(listed.split())  # still one stretch of the passage
+
+
+# --- review round 2 ------------------------------------------------------------------
+
+
+def test_more_arabic_number_words_and_unknown_ones_fail_closed():
+    from dalil.verify import numbers
+    assert numbers("ثلاثمائة درهم") == {"300"}
+    assert numbers("مليون درهم") == {"1000000"}
+    assert numbers("خلال أسبوعين") == {"2"}
+    assert numbers("ثلاثة آلاف درهم") >= {"3"} and len(numbers("ثلاثة آلاف درهم")) == 2  # "آلاف" kept as itself
+    p = passage("sample-fine:p1:1", "The fine is AED 500 for each day of delay.", kind="html")
+    v = Verifier({p["passage_id"]: p}, similarity=lambda c, w: [0.9 for _ in w])
+    quote = {"passage_id": p["passage_id"], "quote": "The fine is AED 500 for each day of delay."}
+    assert not v.check_sentence({"text": "تبلغ الغرامة ثلاثمائة درهم عن كل يوم تأخير.", "citations": [quote]}).kept
+    assert v.check_sentence({"text": "تبلغ الغرامة خمسمائة درهم عن كل يوم تأخير.", "citations": [quote]}).kept
+
+
+def test_aliases_are_capitalised_short_names_shared_by_one_law():
+    from dalil.laws import law_refs
+    rows = [{"file": "sample-law-en.pdf", "title": "Federal Decree by Law No. (12) of 2019 on Samples",
+             "topic": "samples: full text (English)"},
+            {"file": "sample-law-ar.pdf", "title": "مرسوم بقانون اتحادي رقم 12 لسنة 2019",
+             "topic": "samples: SPL Federal Decree-Law 12 of 2019 full text"},
+            {"file": "sample-data-law.pdf", "title": "Law No. (4) of 2015 Regulating Data in the Emirate of Dubai",
+             "topic": "data law: Dubai data dissemination"}]
+    refs = law_refs(rows)
+    assert refs["sample-law-en"].aliases == ("SPL",) == refs["sample-law-ar"].aliases
+    assert refs["sample-data-law"].aliases == ()  # "data law" is not a short name
+
+
+def test_prefixed_arabic_negations_and_soft_negations():
+    q = {"passage_id": PORTAL["passage_id"], "quote": PORTAL_QUOTE}
+    v = Verifier(PASSAGES, similarity=lambda c, w: [0.9 for _ in w])
+    assert not v.check_sentence({"text": "فلا يحق للسكان الاطلاع على سجلاتهم الشخصية.", "citations": [q]}).kept
+    p = passage("sample-scope:p1:1", "This law applies to non-governmental entities that keep records.", kind="html")
+    v2 = Verifier({p["passage_id"]: p}, similarity=lambda c, w: [0.9 for _ in w])
+    claim = {"text": "ينطبق هذا القانون على الجهات غير الحكومية التي تحفظ السجلات.",
+             "citations": [{"passage_id": p["passage_id"], "quote": p["text"]}]}
+    assert v2.check_sentence(claim).kept
+
+
+@pytest.mark.parametrize("q, refused", [
+    ("كيف أزور شهادة راتب؟", True),
+    ("كيف ازور شهادة راتب", True),
+    ("هل يمكنني تجديد الإقامة بعد انتهاء صلاحيتها دون غرامة خلال فترة السماح؟", False),
+    ("كيف أبقى في الدولة بعد انتهاء التأشيرة دون غرامة؟", True),
+])
+def test_arabic_screen_round_two(q, refused):
+    assert safety.screen(q).is_rule_evasion is refused
+
+
+def test_page_number_is_not_stripped_from_an_item_joining_on_a_semicolon():
+    text = "The following apply:\n(a) federal entities that hold data;\n12 persons who exchange data in the emirate."
+    for unit in units(text, pdf=True, page=12):
+        assert " ".join(unit.split()) in " ".join(text.split())
+
+
+def test_a_failed_translation_is_retried_by_a_later_request(tmp_path):
+    class FailsOnce:
+        calls = 0
+
+        def translate(self, q):
+            FailsOnce.calls += 1
+            if FailsOnce.calls == 1:
+                raise TimeoutError("slow")
+            return "Does the records law cover public bodies?"
+
+        def draft(self, question, hits, data, notes=(), english=""):
+            return []
+
+    p = Pipeline(Store(tmp_path / "d.db"), FakeRetriever([as_hit(PORTAL)]), PASSAGES, drafter=FailsOnce(),
+                 zetaris_factory=None)
+    to_english = p._to_english("سؤال", "")
+    assert to_english("سؤال") == ""  # failed in this request
+    assert p._to_english("سؤال", "")("سؤال") == "Does the records law cover public bodies?"  # next request

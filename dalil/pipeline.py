@@ -63,8 +63,10 @@ FIXED_UNCITED = lang.all_fixed({
 # question about a law's reach needs, and how many scope passages are added.
 SCOPE_FROM = 8
 SCOPE_ADD = 3
-# Past reviews whose questions are translated for matching, per request.
+# Past reviews whose questions are translated for matching, per request, and
+# how many translations are kept across requests.
 MEMORY_TRANSLATIONS = 5
+ENGLISH_CACHE_MAX = 2000
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_PASSAGES = REPO_ROOT / "build" / "passages.jsonl"
@@ -152,7 +154,10 @@ class Pipeline:
         if translate is None:
             return None
         cache: dict[str, str] = getattr(self, "_english_cache", {})
+        if len(cache) > ENGLISH_CACHE_MAX:
+            cache = {}
         self._english_cache = cache
+        failed: set[str] = set()  # this request only: a later request tries again
         if english:
             cache[question] = english
 
@@ -164,14 +169,16 @@ class Pipeline:
             so a slow model cannot hold a request for long."""
             if lang.language(text) == lang.ENGLISH:
                 return text
-            if text not in cache:
-                if budget[0] <= 0:
-                    return ""
-                budget[0] -= 1
-                try:
-                    cache[text] = translate(text)
-                except Exception:
-                    cache[text] = ""
+            if text in cache:
+                return cache[text]
+            if text in failed or budget[0] <= 0:
+                return ""
+            budget[0] -= 1
+            try:
+                cache[text] = translate(text)
+            except Exception:
+                failed.add(text)
+                return ""
             return cache[text]
         return to_english
 

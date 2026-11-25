@@ -162,16 +162,17 @@ def units(text: str, pdf: bool = False, limit: int = LIST_UNIT_CHARS, page: int 
     out: list[str] = []
     for sentence in _sentences(text, pdf):
         prev = out[-1] if out else ""
-        lead = _PAGE_NUMBER_LEAD.match(sentence) if pdf and page is not None else None
-        if lead and int(lead.group(0)) == page and not prev.endswith(":"):
-            # The page's own number, printed before a sentence that runs
-            # over from the page before. Stripping a prefix keeps the unit
-            # one stretch of the passage.
-            sentence = sentence[lead.end():].lstrip()
         # An item joins its list when it has a marker, or when the item
         # before it ends in a semicolon, as unmarked lists in laws do.
         joins = prev.endswith(":") or (_open_list(prev) and (
             _LIST_START.match(sentence) or re.search(r"[;\u061b](?:\s+(?:and|or|و|أو))?$", prev)))
+        lead = _PAGE_NUMBER_LEAD.match(sentence) if pdf and page is not None and not joins else None
+        if lead and int(lead.group(0)) == page:
+            # The page's own number, printed before a sentence that runs
+            # over from the page before. Stripping a prefix keeps the unit
+            # one stretch of the passage; a sentence that joins the one
+            # before is never stripped, or the join would skip characters.
+            sentence = sentence[lead.end():].lstrip()
         if prev and joins and len(prev) + 1 + len(sentence) <= limit:
             out[-1] = f"{prev} {sentence}"
         else:
