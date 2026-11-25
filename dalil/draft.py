@@ -440,7 +440,7 @@ class LLMDrafter:
                       "exactly instead of rewording them. Cite Arabic sentences when they say the same as English "
                       "ones. For each claim, first write \"english\": the claim in plain English, using the cited "
                       "sentences' own words; then write \"text\": the same claim in Arabic, a faithful translation "
-                      "of the english, with the same numbers and the same negations."),
+                      "of the english, with the same numbers, negations and law name, and nothing added."),
     }
     SCOPE_RULE = ("The question asks what a law covers or applies to. Answer from that law's own scope article, "
                   "marked [scope] below: say what it applies to and what it says it does not apply to, citing "
