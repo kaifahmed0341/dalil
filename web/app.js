@@ -461,6 +461,7 @@
     activeCite: null, // number
     pages: new Map(),
     pollTimer: null,
+    kbSwitches: 0,    // counts knowledge-base switches, so an answer from before one is not shown after it
     busy: false,
     asking: null,
     sourceToken: 0,
@@ -552,6 +553,9 @@
     try {
       await api.switchKnowledgeBase(id);
       // Questions belong to the knowledge base that answered them: start from its own queue.
+      // A question still being answered on the old one finishes there, and is not shown here.
+      state.kbSwitches++;
+      state.asking = null;
       stopPoll();
       state.selectedId = null;
       state.record = null;
@@ -1171,8 +1175,10 @@
       h("p", null, "Its steps appear here as soon as the screener has read it."));
     $("answer-empty").hidden = false;
     watchForNew(asking);
+    const switches = state.kbSwitches;
     try {
       const res = await api.ask(question);
+      if (state.kbSwitches !== switches) { await loadQueue(); return; }  // switched while it was answered
       state.asking = null;
       input.value = "";
       notify(null);
