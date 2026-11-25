@@ -2,6 +2,7 @@
 
     DALIL_EMBED_URL=http://127.0.0.1:8792/v1 uv run python scripts/run_scenarios.py eval/scenarios/open-data.json
     uv run python scripts/run_scenarios.py eval/scenarios/open-data.json --repeat 3 --extractive
+    uv run python scripts/run_scenarios.py kb/uk/scenarios.json --kb uk
 
 The file format and its checks are in dalil/scenarios.py. Each scenario holds
 the question, the outcome it must show in words ("expect"), and the checks
@@ -30,9 +31,10 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
+from dalil import kb  # noqa: E402
 from dalil import scenarios as sc  # noqa: E402
 from dalil.draft import ExtractiveDrafter, FallbackDrafter, LLMDrafter  # noqa: E402
-from dalil.pipeline import DEFAULT_PASSAGES, Pipeline  # noqa: E402
+from dalil.pipeline import Pipeline  # noqa: E402
 from dalil.store import Store  # noqa: E402
 
 
@@ -53,7 +55,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("file", type=Path, help="a scenario file, JSON")
     ap.add_argument("--repeat", type=int, help="runs per question (default: the file's own)")
     ap.add_argument("--extractive", action="store_true", help="draft without the model")
-    ap.add_argument("--passages", type=Path, default=DEFAULT_PASSAGES, help="the knowledge base's passages.jsonl")
+    ap.add_argument("--kb", help="knowledge-base profile under kb/ (default: DALIL_KB, else uae)")
     ap.add_argument("--only", action="append", default=[], metavar="ID", help="run only these scenario ids")
     args = ap.parse_args(argv)
 
@@ -65,9 +67,13 @@ def main(argv: list[str] | None = None) -> int:
     out.mkdir(parents=True)
     store = Store(out / "scenarios.db")
     drafter = ExtractiveDrafter() if args.extractive else FallbackDrafter(LLMDrafter(), ExtractiveDrafter())
-    pipeline = Pipeline.from_build(store, passages_path=args.passages, drafter=drafter, memory=LocalMemory())
+    profile = kb.load(args.kb or kb.active_id())
+    if not args.extractive:
+        drafter.primary.audience = profile.audience
+    pipeline = Pipeline.from_profile(profile, store, drafter=drafter, memory=LocalMemory())
     source, why = pipeline.data_source()
-    print(f"{spec.name}: {len(spec.scenarios)} scenarios x {repeat} runs; open data: "
+    print(f"{spec.name}: knowledge base {profile.id} ({len(pipeline.passages)} passages); "
+          f"{len(spec.scenarios)} scenarios x {repeat} runs; open data: "
           f"{getattr(source, 'label', None) or why}")
 
     report, summary = [], []
@@ -81,7 +87,7 @@ def main(argv: list[str] | None = None) -> int:
             rec = pipeline.answer(s.question)
             took = time.monotonic() - started
             row = store.get(rec.id)
-            results = sc.evaluate(s, rec, row)
+            results = sc.evaluate(s, rec, row, fixed=pipeline.screener.fixed_texts)
             ok = all(results.values())
             passed += ok
             drafted = next((e["detail"] for e in row["audit"] if e["kind"] == "drafted"), {})

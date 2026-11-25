@@ -11,6 +11,7 @@ through the store (or the HTTP app).
 
 from __future__ import annotations
 
+import os
 import sys
 
 from dataclasses import asdict, dataclass, field
@@ -20,7 +21,7 @@ from typing import Any, Callable, Mapping
 from dalil import lang, safety
 from dalil.draft import (FEE_CAVEAT, LAW_CAVEAT, WEAK_REFUSAL, Drafter, ExtractiveDrafter, caveat, data_claims,
                          refusal)
-from dalil.opendata import DataResult, match_rules, run_rules
+from dalil.opendata import RULES, DataResult, match_rules, run_rules
 from dalil.retrieve import Hit, Searcher, make_retriever
 from dalil.store import Store
 from dalil.hmem import Guidance, guidance
@@ -33,21 +34,22 @@ def cited_passages(check: dict[str, Any] | None) -> list[str]:
                    for c in s.get("citations", []) if c.get("passage_id")})
 
 
-def document_titles() -> dict[str, str]:
+def document_titles(manifest: Path | str | None = None) -> dict[str, str]:
     """doc_id -> title from the manifest, or nothing if it cannot be read."""
     from dalil.corpus import doc_id, load_manifest
     try:
-        return {doc_id(r["file"]): r.get("title", "") for r in load_manifest()}
+        rows = load_manifest(manifest) if manifest else load_manifest()
+        return {doc_id(r["file"]): r.get("title", "") for r in rows}
     except Exception as e:
         print(f"warning: no document titles for the checker ({type(e).__name__})", file=sys.stderr)
         return {}
 
 
-def manifest_laws() -> dict[str, Any]:
+def manifest_laws(manifest: Path | str | None = None) -> dict[str, Any]:
     """doc_id -> LawRef for every numbered law in the manifest, or nothing."""
     from dalil.corpus import load_manifest
     try:
-        return law_refs(load_manifest())
+        return law_refs(load_manifest(manifest) if manifest else load_manifest())
     except Exception as e:
         print(f"warning: no law list for the checker ({type(e).__name__})", file=sys.stderr)
         return {}
@@ -111,7 +113,8 @@ class Pipeline:
     def __init__(self, store: Store, retriever: Searcher, passages: dict[str, dict[str, Any]],
                  drafter: Drafter | None = None,
                  zetaris_factory: Callable[[], Any] | None = default_data_source, k: int = K,
-                 memory: Any = None):
+                 memory: Any = None, screener: safety.Screener | None = None,
+                 rules: tuple[Any, ...] = RULES, manifest: Path | str | None = None):
         self.store = store
         self.retriever = retriever
         self.passages = passages
@@ -123,13 +126,41 @@ class Pipeline:
         self._zetaris: Any = None
         # Review memory (dalil.hmem.HMem or a stand-in with recall()); None turns it off.
         self.memory = memory
-        self.titles = document_titles()
-        self.laws = manifest_laws()
+        # The knowledge base's own ID formats and fixed sentences (dalil/kb.py).
+        self.screener = screener or safety.DEFAULT_SCREENER
+        self.fixed_uncited = lang.all_fixed({WEAK_REFUSAL, FEE_CAVEAT, LAW_CAVEAT, *self.screener.fixed_texts.values()})
+        # Open-data rules that apply to this knowledge base; () for none.
+        self.rules = tuple(rules)
+        self.titles = document_titles(manifest)
+        self.laws = manifest_laws(manifest)
 
     @classmethod
     def from_build(cls, store: Store | None = None, passages_path: Path | str = DEFAULT_PASSAGES,
                    **kwargs: Any) -> "Pipeline":
         return cls(store or Store(), make_retriever(passages_path), load_passages(passages_path), **kwargs)
+
+    @classmethod
+    def from_profile(cls, profile: Any, store: Store | None = None, **kwargs: Any) -> "Pipeline":
+        """A pipeline over one knowledge-base profile (dalil.kb.Profile): its
+        passages, store, screener, manifest and open data."""
+        from dalil import datasource
+
+        if profile.open_data_dir is None:
+            factory = None
+        else:
+            def factory() -> Any:
+                env = {**os.environ, "DALIL_OPEN_DATA_DIR": str(profile.open_data_dir)}
+                source, why = datasource.resolve(env, zetaris_timeout=ZETARIS_TIMEOUT)
+                if source is None:
+                    raise NoSource(why)
+                if why:
+                    print(f"open data: {why}", file=sys.stderr)
+                return source
+        kwargs.setdefault("zetaris_factory", factory)
+        kwargs.setdefault("screener", profile.screener)
+        kwargs.setdefault("rules", RULES if profile.open_data_rules else ())
+        kwargs.setdefault("manifest", profile.manifest)
+        return cls.from_build(store or Store(profile.store), passages_path=profile.passages, **kwargs)
 
     def data_source(self) -> tuple[Any, str]:
         """The open-data source and "", or None and why it is unavailable."""
@@ -156,6 +187,9 @@ class Pipeline:
         mode, Zetaris down means the local database takes over)."""
         from dalil import datasource
 
+        if self.zetaris_factory is None and not self.rules:
+            # A knowledge base with no open data at all, such as kb/uk.
+            return {**datasource.status(None), "label": "Open data: none for this knowledge base"}
         source, _ = self.data_source()
         out = datasource.status(source)
         if source is not None and not out["connected"]:
@@ -214,7 +248,7 @@ class Pipeline:
                    text=p["text"], start=int(p["start"]), end=int(p["end"]), kind=p.get("kind") or "")
 
     def answer(self, question: str) -> Record:
-        screened = safety.screen(question)
+        screened = self.screener.screen(question)
         # From here on only the redacted text exists.
         qid = self.store.create_question(screened.redacted_question, screened.flags)
         self.store.event(qid, "screened", {"flags": screened.flags})
@@ -233,13 +267,13 @@ class Pipeline:
         client = None
         if screened.is_rule_evasion:
             self.store.event(qid, "retrieved", {"skipped": "rule_evasion", "hits": 0})
-            draft = [refusal(safety.REFUSAL_TEXT), refusal(safety.REFUSAL_FOLLOW_UP)]
+            draft = [refusal(self.screener.refusal_text), refusal(self.screener.refusal_follow_up)]
         elif screened.is_vague:
             # Too few key words to know the subject: ask, rather than guess.
             self.store.event(qid, "retrieved", {"skipped": "vague_question", "hits": 0})
-            draft = [refusal(safety.ASK_FOR_DETAIL)]
+            draft = [refusal(self.screener.ask_for_detail)]
             if screened.has_personal_data:
-                draft.append(caveat(safety.PERSONAL_DATA_CAVEAT))
+                draft.append(caveat(self.screener.personal_data_caveat))
         else:
             past = self.recall(qid, q)
             hits = self.search(q, past.avoid)
@@ -247,7 +281,7 @@ class Pipeline:
                 "k": self.k, "hits": len(hits),
                 "top": [{"passage_id": h.passage_id, "score": round(h.score, 3)} for h in hits[:3]],
             })
-            rules = match_rules(q)
+            rules = match_rules(q, self.rules)
             if rules:
                 client, why = self.data_source()
                 run = (lambda sql: client.sql(sql, limit=200).dicts()) if client else None
@@ -263,7 +297,7 @@ class Pipeline:
                 })
             draft = self.drafter.draft(q, hits, data, notes=past.notes)
             if screened.has_personal_data:
-                draft = [*draft, caveat(safety.PERSONAL_DATA_CAVEAT)]
+                draft = [*draft, caveat(self.screener.personal_data_caveat)]
         # Fixed refusals and caveats go out in the question's language.
         question_lang = lang.language(q)
         draft = [{**s, "text": lang.fixed(s["text"], question_lang)} if s.get("kind") in ("refusal", "caveat") else s
@@ -280,7 +314,7 @@ class Pipeline:
         if client is None and any("sql" in c for s in draft for c in s.get("citations") or []):
             client, _ = self.data_source()
         verifier = Verifier(self.passages, data_lookup(client) if client else None,
-                            allowed_sql=[d.sql for d in data], allowed_uncited=FIXED_UNCITED,
+                            allowed_sql=[d.sql for d in data], allowed_uncited=self.fixed_uncited,
                             allowed_passages=[h.passage_id for h in hits], titles=self.titles, laws=self.laws,
                             similarity=getattr(self.retriever, "similarities", None),
                             data_facts={d.sql: " ".join(f for f in (d.fact, d.fact_ar) if f) for d in data if d.fact})

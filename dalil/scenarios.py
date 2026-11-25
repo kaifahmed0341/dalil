@@ -29,6 +29,10 @@ Every check under "checks" must hold for the run to pass. The checks:
     not_stored        none of these strings appears anywhere in the stored row
     no_money          true: no kept sentence states a price
     claims_language   "en" or "ar": every kept claim is written in that language
+    no_lookup         true: no open-data query ran
+
+The fixed sentences are the knowledge base's own (dalil/kb.py), so a UK
+scenario's REFUSAL_TEXT is the UK refusal.
 
 A check that is not on this list fails the run, so a typo cannot pass.
 """
@@ -148,12 +152,16 @@ def _kept_text(rec: Any) -> str:
     return " ".join(s["text"] for s in _kept(rec.check))
 
 
-def _kept_includes(rec: Any, row: Any, names: list[str]) -> bool:
-    return all(FIXED[n] in _kept_text(rec) for n in names)
+def _kept_includes(rec: Any, row: Any, names: list[str], fixed: Mapping[str, str] = FIXED) -> bool:
+    return all(fixed[n] in _kept_text(rec) for n in names)
 
 
-def _kept_any_of(rec: Any, row: Any, names: list[str]) -> bool:
-    return any(FIXED[n] in _kept_text(rec) for n in names)
+def _kept_any_of(rec: Any, row: Any, names: list[str], fixed: Mapping[str, str] = FIXED) -> bool:
+    return any(fixed[n] in _kept_text(rec) for n in names)
+
+
+def _no_lookup(rec: Any, row: Any, want: bool) -> bool:
+    return (not rec.data) == bool(want)
 
 
 def _not_stored(rec: Any, row: Any, raw: list[str]) -> bool:
@@ -181,9 +189,14 @@ CHECKS = {
     "nothing_retrieved": _nothing_retrieved, "flags_include": _flags_include,
     "question_contains": _question_contains, "kept_includes": _kept_includes, "kept_any_of": _kept_any_of,
     "not_stored": _not_stored, "no_money": _no_money, "claims_language": _claims_language,
+    "no_lookup": _no_lookup,
 }
+_USES_FIXED = {"kept_includes", "kept_any_of"}
 
 
-def evaluate(scenario: Scenario, rec: Any, row: Any) -> dict[str, bool]:
-    """Each check's result for one run. The run passes when all are True."""
-    return {name: bool(CHECKS[name](rec, row, arg)) for name, arg in scenario.checks.items()}
+def evaluate(scenario: Scenario, rec: Any, row: Any, fixed: Mapping[str, str] | None = None) -> dict[str, bool]:
+    """Each check's result for one run. The run passes when all are True.
+    `fixed` overrides the named fixed sentences, for another knowledge base."""
+    names = {**FIXED, **(fixed or {})}
+    return {name: bool(CHECKS[name](rec, row, arg, names) if name in _USES_FIXED else CHECKS[name](rec, row, arg))
+            for name, arg in scenario.checks.items()}

@@ -54,7 +54,8 @@ def test_post_and_list(client):
 def test_detail_shape(client):
     qid = ask(client)["id"]
     d = client.get(f"/api/questions/{qid}").json()
-    assert set(d) == {"id", "question", "flags", "status", "created_at", "retrieval", "data", "check", "review", "audit"}
+    assert set(d) == {"id", "question", "flags", "status", "created_at", "retrieval", "data", "check", "review", "audit",
+                      "knowledge_base"}
     assert set(d["retrieval"][0]) == {"passage_id", "doc_id", "title", "page", "score", "heading", "text", "start", "end"}
     assert d["retrieval"][0]["title"] == "Renewing a card"
     assert set(d["data"][0]) == {"table", "sql", "rows", "note", "source", "source_label"}
@@ -122,7 +123,9 @@ def test_pages_and_files(client):
 def test_health(client):
     assert client.get("/api/health").json() == {
         "ok": True, "zetaris": True, "passages": len(PASSAGES), "memory": False, "memories": 0,
-        "data_source": {"connected": True, "kind": "zetaris", "label": "Open data: Zetaris", "tables": []}}
+        "data_source": {"connected": True, "kind": "zetaris", "label": "Open data: Zetaris", "tables": []},
+        "knowledge_base": {"id": "default", "name": "Knowledge base", "country": "",
+                           "documents": len(DOCUMENTS), "passages": len(PASSAGES)}}
 
 
 def test_empty_question_rejected(client):

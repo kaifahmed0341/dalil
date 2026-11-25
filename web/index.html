@@ -19,14 +19,20 @@
       </div>
     </div>
     <form id="ask-form" class="ask" autocomplete="off">
-      <label for="ask-input" class="ask-label">Ask about a UAE government service</label>
+      <label for="ask-input" class="ask-label" id="ask-label">Ask about a UAE government service</label>
       <div class="ask-row">
         <input id="ask-input" name="question" type="text" dir="auto" required
                placeholder="For example: How is end of service gratuity worked out?">
         <button type="submit" class="btn btn-primary" id="ask-submit">Ask Dalil</button>
       </div>
     </form>
-    <div id="health" class="health" role="status" aria-live="polite"></div>
+    <div class="topbar-side">
+      <div class="kb-picker">
+        <label for="kb-select">Knowledge base</label>
+        <select id="kb-select" disabled><option>Loading</option></select>
+      </div>
+      <div id="health" class="health" role="status" aria-live="polite"></div>
+    </div>
   </header>
 
   <div id="notice" class="notice" role="alert" hidden></div>

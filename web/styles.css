@@ -79,6 +79,14 @@ code, pre { font-family: var(--mono); font-size: 13px; }
 }
 .ask-row input:focus { background: #fff; }
 
+.topbar-side { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; align-self: center; }
+.kb-picker { display: flex; align-items: center; gap: 8px; font-size: 12.5px; }
+.kb-picker label { font-weight: 600; }
+.kb-picker select {
+  max-width: 400px; padding: 5px 8px; font: inherit; color: inherit;
+  border: 1px solid var(--line-strong); border-radius: var(--radius); background: var(--surface-2);
+}
+.kb-picker select:disabled { color: var(--muted); }
 .health { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; font-size: 12.5px; color: var(--muted); align-self: center; white-space: nowrap; }
 .health > span:not(.badge) { display: inline-flex; align-items: center; }
 .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
@@ -330,7 +338,7 @@ a:hover { color: #063d3e; }
   .review-foot { flex-direction: column; align-items: stretch; }
   .review-fields { grid-template-columns: 1fr; }
   .topbar { grid-template-columns: 1fr; gap: 10px; }
-  .health { align-items: flex-start; }
+  .health, .topbar-side { align-items: flex-start; }
   .layout { grid-template-columns: 1fr; }
   .queue { max-height: 40vh; border-right: none; border-bottom: 1px solid var(--line); }
 }

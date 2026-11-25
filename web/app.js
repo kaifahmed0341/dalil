@@ -123,6 +123,8 @@
     review: (id, body) => http("POST", "/api/questions/" + encodeURIComponent(id) + "/review", body),
     page: (doc, page) => http("GET", "/api/documents/" + encodeURIComponent(doc) + "/pages/" + encodeURIComponent(page)),
     fileUrl: (doc) => "/api/documents/" + encodeURIComponent(doc) + "/file",
+    knowledgeBases: () => http("GET", "/api/knowledge-bases"),
+    switchKnowledgeBase: (id) => http("POST", "/api/knowledge-base", { id }),
   };
 
   function mockApi() {
@@ -189,6 +191,12 @@
         return copy(p);
       },
       fileUrl: () => null,
+      knowledgeBases: async () => {
+        await ready;
+        const kb = fx.health.knowledge_base || { id: "sample", name: "Sample knowledge base", documents: null, passages: fx.health.passages };
+        return [Object.assign({ active: true, loaded: true }, kb)];
+      },
+      switchKnowledgeBase: async () => { throw new Error("Sample data has one knowledge base."); },
     };
   }
 
@@ -227,9 +235,59 @@
       el.append(h("span", null, h("span", { class: "dot " + (ok ? "dot-ok" : "dot-off"), "aria-hidden": "true" }),
         src.label +
           (typeof hl.passages === "number" ? ", " + hl.passages.toLocaleString("en-GB") + " passages" : "")));
+      const kb = hl.knowledge_base;
+      if (kb && kb.ask_label) $("ask-label").textContent = kb.ask_label;
+      if (kb && kb.example_question) $("ask-input").placeholder = kb.example_question;
     } catch (e) {
       el.append(h("span", null, h("span", { class: "dot dot-bad", "aria-hidden": "true" }), "Server not reachable"));
     }
+  }
+
+  // ---------- knowledge base ----------
+  function kbLabel(k) {
+    const parts = [];
+    if (typeof k.documents === "number") parts.push(k.documents.toLocaleString("en-GB") + " documents");
+    if (typeof k.passages === "number") parts.push(k.passages.toLocaleString("en-GB") + " passages");
+    return k.name + (parts.length ? " (" + parts.join(", ") + ")" : "");
+  }
+
+  async function loadKnowledgeBases() {
+    const sel = $("kb-select");
+    try {
+      const list = await api.knowledgeBases();
+      clear(sel);
+      for (const k of list) sel.append(h("option", { value: k.id, selected: k.active }, kbLabel(k)));
+      sel.disabled = list.length < 2;
+    } catch (e) {
+      sel.disabled = true;
+    }
+  }
+
+  async function switchKnowledgeBase(e) {
+    const sel = e.target;
+    const id = sel.value;
+    sel.disabled = true;
+    notify(null);
+    const el = clear($("health"));
+    el.append(h("span", null, h("span", { class: "dot dot-off", "aria-hidden": "true" }), "Loading the knowledge base..."));
+    try {
+      await api.switchKnowledgeBase(id);
+      // Questions belong to the knowledge base that answered them: start from its own queue.
+      stopPoll();
+      state.selectedId = null;
+      state.record = null;
+      state.cites = [];
+      state.activeCite = null;
+      history.replaceState(null, "", location.pathname + location.search);
+      renderRecord();
+      renderSourceEmpty();
+      clear($("searched"));
+      await Promise.all([loadHealth(), loadQueue()]);
+    } catch (err) {
+      notify("Could not switch the knowledge base. " + err.message);
+      loadHealth();
+    }
+    await loadKnowledgeBases();
   }
 
   // ---------- queue ----------
@@ -763,6 +821,8 @@
     $("review-form").addEventListener("submit", (e) => e.preventDefault());
     initTabs();
     if (MOCK) document.title = "Dalil reviewer (sample data)";
+    $("kb-select").addEventListener("change", switchKnowledgeBase);
+    loadKnowledgeBases();
     loadHealth();
     await loadQueue();
     const fromHash = decodeURIComponent(location.hash.slice(1));
