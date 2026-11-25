@@ -12,6 +12,7 @@ through the store (or the HTTP app).
 from __future__ import annotations
 
 import os
+import re
 import sys
 
 from dataclasses import asdict, dataclass, field
@@ -364,6 +365,7 @@ class Pipeline:
         hits: list[Hit] = []
         english = ""  # the question in English, when it was asked in another language
         data: list[DataResult] = []
+        rules: list[Any] = []
         client = None
         if screened.is_rule_evasion:
             self.store.event(qid, "retrieved", {"skipped": "rule_evasion", "hits": 0})
@@ -432,7 +434,7 @@ class Pipeline:
                             data_facts={d.sql: " ".join(f for f in (d.fact, d.fact_ar, d.meaning) if f)
                                         for d in data if d.fact})
         check = verifier.check_answer(draft).to_dict()
-        added = restate_data(draft, check, data, question_lang)
+        added = restate_data(draft, check, data, question_lang, counted=counted_lookups(q, english, rules))
         if added:
             draft = added
             check = verifier.check_answer(draft).to_dict()
@@ -626,8 +628,23 @@ def _drop_unstated_data(sentence: dict[str, Any]) -> dict[str, Any]:
     return {**sentence, "citations": keep, "unstated_data_dropped": len(cits) - len(keep)}
 
 
+_COUNT_QUESTION = re.compile(r"\bhow\s+many\b|\bnumber\s+of\b|كم\s+عدد|عدد", re.I)
+
+
+def counted_lookups(question: str, english: str, rules: Any) -> set[str]:
+    """The queries of rules a question asks the count of: the rule matches in a
+    sentence of the question that asks how many."""
+    out = set()
+    for text in (question, english):
+        for sentence in re.split(r"[.?!؟\n]+", text or ""):
+            if _COUNT_QUESTION.search(sentence):
+                out |= {r.sql for r in rules or () if r.pattern.search(sentence)}
+    return out
+
+
 def restate_data(draft: list[dict[str, Any]], check: dict[str, Any], data: list[DataResult],
-                 language: str = "en") -> list[dict[str, Any]] | None:
+                 language: str = "en", counted: set[str] | frozenset[str] = frozenset()
+                 ) -> list[dict[str, Any]] | None:
     """A new draft when the model tried to state an open-data result but no
     kept sentence states it; else None.
 
@@ -640,7 +657,8 @@ def restate_data(draft: list[dict[str, Any]], check: dict[str, Any], data: list[
     values in its row other than the year. The rule's own fixed sentence (dalil/opendata.py) then
     states the value, with a citation the checker reruns like any other. The
     model's cut sentence stays in the record for the reviewer to see. A lookup
-    the model left alone is left out: it judged the data off the question.
+    the model left alone is left out: it judged the data off the question,
+    unless the question asks how many, which the lookup answers.
     """
     sentences = check.get("sentences", [])
     out = [_drop_unstated_data(s) for s in draft]
@@ -659,7 +677,7 @@ def restate_data(draft: list[dict[str, Any]], check: dict[str, Any], data: list[
         tried = any(s.get("kind", "claim") == "claim" and (
             any(c.get("sql") == res.sql for c in s.get("citations") or []) or _numbers(s.get("text", "")) & values)
             for s in draft)
-        if tried:
+        if tried or res.sql in counted:
             # In the question's language: the Arabic sentence when there is one.
             said = DataResult(res.table, res.sql, res.rows, fact=res.fact_ar if language == lang.ARABIC and res.fact_ar
                               else res.fact)
