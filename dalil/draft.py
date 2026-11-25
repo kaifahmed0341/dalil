@@ -24,6 +24,7 @@ import string
 import threading
 from collections import Counter
 from collections.abc import Sequence
+from pathlib import Path
 from typing import Any, Mapping, Protocol, runtime_checkable
 from urllib.parse import urlsplit
 from urllib.request import Request, urlopen
@@ -180,10 +181,15 @@ def _open_list(unit: str) -> bool:
 def heading_like(unit: str) -> bool:
     """A heading or running page header rather than a sentence: short, no end
     mark, most words capitalised, as in "Scope of Application of the Decree by
-    Law". It says what a passage is about but states nothing, so a claim
-    cannot rest on it. Arabic has no capitals, so no Arabic line is caught."""
+    Law", or a short question heading such as "What is the Golden visa?". It
+    says what a passage is about but states nothing, so a claim cannot rest on
+    it. Arabic has no capitals, so only Arabic question headings are caught."""
     words = unit.split()
-    if not words or len(words) > 12 or unit[-1] in _TERMINAL or _LIST_START.match(unit):
+    if not words or len(words) > 12 or _LIST_START.match(unit):
+        return False
+    if unit[-1] in "?\u061f":
+        return True  # a page's own question heading, "What is the Golden visa?"
+    if unit[-1] in _TERMINAL:
         return False
     content = [w for w in words if w[0].isalpha() and w.lower() not in _SMALL_WORDS]
     return bool(content) and sum(w[0].isupper() for w in content) >= 0.75 * len(content)
@@ -222,6 +228,45 @@ def weak(question: str, hits: Sequence[Hit], weak_score: float = WEAK_SCORE) -> 
 
 def _is_scope(h: Hit) -> bool:
     return is_scope_passage({"page": h.page, "text": h.text})
+
+
+_RUNNING_MIN_PAGES = 3
+_RUNNING_SHARE = 0.3
+
+
+def _line_key(line: str) -> str:
+    return " ".join(re.sub(r"[\d\u0660-\u0669]+", " ", line).split())
+
+
+@functools.cache
+def running_lines() -> dict[str, frozenset[str]]:
+    """running_lines from build/documents.jsonl, read once."""
+    from dalil.corpus import REPO_ROOT
+    return _running_from(REPO_ROOT / "build" / "documents.jsonl")
+
+
+def _running_from(file: Path) -> dict[str, frozenset[str]]:
+    """doc_id -> the page headers and footers of a PDF: lines that recur, page
+    numbers aside, on at least three pages and on 30% of its pages, such as
+    a law's title and its publisher's name at the top of every page. They are
+    not sentences of the law, so the writer is never offered one to cite.
+    Read from build/documents.jsonl; empty when it is missing."""
+    from dalil.chunk import read_jsonl
+    if not file.is_file():
+        return {}
+    out: dict[str, frozenset[str]] = {}
+    for doc in read_jsonl(file):
+        pages = doc.get("pages") or []
+        if doc.get("kind") != "pdf" or len(pages) < _RUNNING_MIN_PAGES:
+            continue
+        counts: Counter[str] = Counter()
+        for p in pages:
+            lines = [l for l in (p.get("text") or "").split("\n") if l.strip()]
+            edge = lines[:3] + lines[-3:]  # headers and footers sit at a page's top or bottom
+            counts.update({k for l in edge if len(l.split()) <= 16 for k in [_line_key(l)] if k})
+        need = max(_RUNNING_MIN_PAGES, _RUNNING_SHARE * len(pages))
+        out[doc["doc_id"]] = frozenset(k for k, n in counts.items() if n >= need)
+    return out
 
 
 @functools.cache
@@ -377,6 +422,8 @@ class LLMDrafter:
         "Prefer sentences about exactly what was asked; leave out side details.",
         "When a claim says what a law says, name that law in the claim by its number and year, as its passage "
         "header gives it. Never present a sentence from one law as if it were about another law.",
+        "Each claim rests on one source document. Never join sentences about different services, people or "
+        "laws into one claim.",
         "Reviewers rejected earlier answers to similar questions with the notes given. Do not repeat those mistakes.",
     )
     LANGUAGE_RULES = {
@@ -410,9 +457,13 @@ class LLMDrafter:
         Sentences under MIN_QUOTE_WORDS words cannot back a claim and are left out.
         """
         out: dict[str, tuple[str, str]] = {}
+        running = running_lines()
         for h in sorted(hits, key=lambda h: not _is_scope(h)) if scope_first else hits:
             used = 0
+            furniture = running.get(h.doc_id, frozenset())
             for sentence in units(h.text, pdf=h.kind == "pdf"):
+                if furniture and _line_key(sentence) in furniture:
+                    continue
                 used += len(sentence)
                 if used > self.max_passage_chars and used > len(sentence):
                     break
@@ -429,6 +480,13 @@ class LLMDrafter:
         rule_list = [*self.PROMPT_RULES, self.LANGUAGE_RULES[question_lang]]
         if scope:
             rule_list.append(self.SCOPE_RULE)
+        from dalil.subjects import subject_docs
+        titles = doc_titles()
+        subjects = subject_docs(question, titles)
+        if subjects:
+            names = ", ".join(sorted({titles[d] for d in subjects}))
+            rule_list.append(f"The question is about: {names}. Sources marked [other subject] are about something "
+                             "else; use one of their sentences only if it names the question's subject itself.")
         rules = "\n".join(f"- {r}" for r in rule_list)
         system = ("You answer questions from UAE residents about government services, using only the "
                   "numbered source sentences given. Reply with JSON only, matching the schema. "
@@ -438,13 +496,14 @@ class LLMDrafter:
         by_passage: dict[str, list[str]] = {}
         for sid, (pid, sentence) in numbered.items():
             by_passage.setdefault(pid, []).append(f"[{sid}] {sentence}")
-        titles = doc_titles()
         order = {pid: i for i, (pid, _) in enumerate(numbered.values())}
         for h in sorted(hits, key=lambda h: order.get(h.passage_id, len(order))):
             if h.passage_id in by_passage:
                 head = f" | {h.heading}" if h.heading else ""
                 title = f" | {titles[h.doc_id]}" if titles.get(h.doc_id) else ""
                 mark = " [scope]" if scope and _is_scope(h) else ""
+                if subjects and h.doc_id not in subjects:
+                    mark += " [other subject]"
                 parts.append(f"Passage {h.passage_id}{head}{title}{mark}")
                 parts += by_passage[h.passage_id]
         parts.append("</sources>")
@@ -534,7 +593,7 @@ class LLMDrafter:
                     # Anything else, such as a passage id and quote of the model's
                     # own, never reaches the checker as a usable citation.
                     cits.append({"passage_id": "unknown:not-a-given-sentence", "quote": ""})
-            if text:
+            if text and text.casefold() not in {s["text"].casefold() for s in out}:
                 out.append({"text": text, "kind": "claim", "citations": cits})
         if not out:
             return [refusal()]

@@ -24,6 +24,7 @@ from dalil.retrieve import Hit, Searcher, make_retriever
 from dalil.store import Store
 from dalil.hmem import Guidance, guidance
 from dalil.laws import is_scope_question, law_refs, scope_passages
+from dalil.subjects import names_subject, subject_docs
 from dalil.verify import Verifier, load_passages, zetaris_lookup
 
 def cited_passages(check: dict[str, Any] | None) -> list[str]:
@@ -92,7 +93,7 @@ class Pipeline:
     def __init__(self, store: Store, retriever: Searcher, passages: dict[str, dict[str, Any]],
                  drafter: Drafter | None = None,
                  zetaris_factory: Callable[[], Any] | None = default_zetaris, k: int = K,
-                 memory: Any = None):
+                 memory: Any = None, redraft: bool = True):
         self.store = store
         self.retriever = retriever
         self.passages = passages
@@ -102,6 +103,9 @@ class Pipeline:
         self._zetaris: Any = None
         # Review memory (dalil.hmem.HMem or a stand-in with recall()); None turns it off.
         self.memory = memory
+        # When the checker cuts every claim the model wrote, quote the sources
+        # with the extractive drafter instead of holding an empty answer.
+        self.redraft = redraft
         self.titles = document_titles()
         self.laws = manifest_laws()
 
@@ -149,6 +153,7 @@ class Pipeline:
         """
         hits = self.retriever.search(question, self.k + len(avoid))
         hits = [h for h in hits if h.passage_id not in avoid][: self.k]
+        hits = self.on_subject(question, hits)
         if not is_scope_question(question) or not self.laws:
             return hits
         law_docs = list(dict.fromkeys(h.doc_id for h in hits[:SCOPE_FROM] if h.doc_id in self.laws))
@@ -161,6 +166,27 @@ class Pipeline:
         extra = [pid for pid in scope_passages(wanted, self.passages)
                  if pid not in have and pid not in avoid][:SCOPE_ADD]
         return [self._hit(pid) for pid in extra] + hits
+
+    @staticmethod
+    def _all_claims_cut(check: dict[str, Any]) -> bool:
+        claims = [s for s in check["sentences"] if s["kind"] == "claim"]
+        return bool(claims) and not any(s["kept"] for s in claims)
+
+    def on_subject(self, question: str, hits: list[Hit]) -> list[Hit]:
+        """When the question names a service that has its own page, and that
+        page is in the results, keep only passages that can be about it: that
+        page, the laws, and passages that name the service themselves.
+
+        "Can a Golden Visa holder sponsor their parents?" otherwise gets the
+        rules for employees' families and for UAE citizens' parents, which
+        read close to the question and do not apply to it."""
+        titles, laws = getattr(self, "titles", {}), getattr(self, "laws", {})
+        subjects = subject_docs(question, titles)
+        if not subjects or not any(h.doc_id in subjects for h in hits):
+            return hits
+        names = [titles[d].split("|")[0] for d in subjects]
+        return [h for h in hits if h.doc_id in subjects or h.doc_id in laws
+                or names_subject(f"{titles.get(h.doc_id, '')} {h.heading or ''} {h.text}", names)]
 
     def _language(self, doc_id: str) -> str:
         for p in self.passages.values():
@@ -234,11 +260,32 @@ class Pipeline:
         })
         if client is None and any("sql" in c for s in draft for c in s.get("citations") or []):
             client, _ = self.zetaris()
+        subjects = {d: self.titles[d] for d in subject_docs(q, self.titles) if any(h.doc_id == d for h in hits)}
         verifier = Verifier(self.passages, zetaris_lookup(client) if client else None,
                             allowed_sql=[d.sql for d in data], allowed_uncited=FIXED_UNCITED,
                             allowed_passages=[h.passage_id for h in hits], titles=self.titles, laws=self.laws,
-                            similarity=getattr(self.retriever, "similarities", None))
+                            similarity=getattr(self.retriever, "similarities", None), question=q,
+                            subjects=subjects)
         check = verifier.check_answer(draft).to_dict()
+        if self.redraft and self._all_claims_cut(check) and not isinstance(self.drafter, ExtractiveDrafter):
+            # The model's every claim failed the checker. Quote the sources
+            # instead: the extractive drafter copies whole source sentences,
+            # so whatever it keeps is the documents' own words.
+            # Quote from the page the question is about, when it names one.
+            redraft = ExtractiveDrafter().draft(q, [h for h in hits if h.doc_id in subjects] or hits, data)
+            if screened.has_personal_data:
+                redraft = [*redraft, caveat(safety.PERSONAL_DATA_CAVEAT)]
+            redraft = [{**s, "text": lang.fixed(s["text"], question_lang)}
+                       if s.get("kind") in ("refusal", "caveat") else s for s in redraft]
+            second = verifier.check_answer(redraft).to_dict()
+            if lang.language(" ".join(s["text"] for s in second["sentences"] if s["kept"])) == question_lang \
+                    and any(s["kept"] and s["kind"] == "claim" for s in second["sentences"]) \
+                    and second["status"] != "held":
+                self.store.event(qid, "redrafted", {"drafter": "ExtractiveDrafter",
+                                                    "reason": "the checker cut every claim the model wrote",
+                                                    "cut_first": [s["reasons"] for s in check["sentences"]
+                                                                  if not s["kept"]]})
+                draft, check = redraft, second
         kept = sum(s["kept"] for s in check["sentences"])
         self.store.event(qid, "verified", {"status": check["status"], "kept": kept,
                                            "cut": len(check["sentences"]) - kept})

@@ -98,6 +98,7 @@ def test_held_answer_can_only_be_rejected(client):
                      "citations": [{"passage_id": "doc-a:p1:1", "quote": "It costs AED 50 to renew."}]}]
 
     client.pipeline.drafter = Fabricator()
+    client.pipeline.redraft = False  # hold the bad draft rather than quote the sources instead
     qid = ask(client, "What does renewing the resident card cost?")["id"]
     assert client.get(f"/api/questions/{qid}").json()["status"] == "held"
     r = client.post(f"/api/questions/{qid}/review", json={"decision": "approve", "reviewer": "a", "note": ""})

@@ -194,6 +194,8 @@ def test_headings_are_not_offered_as_sentences():
     assert heading_like("Federal Law Concerning Personal Records")
     assert not heading_like("A copy of the tenancy contract")
     assert not heading_like("Renewal costs AED 20 a day.")
+    assert heading_like("What is the sample card?") and heading_like("ما هي البطاقة؟")
+    assert not heading_like("Can a resident who has held the card for more than ten full years ask for a longer one?")
     numbered = LLMDrafter().numbered([as_hit(FED_SCOPE)])
     assert all(not heading_like(s) for _, s in numbered.values())
 
@@ -324,3 +326,26 @@ def test_clauses_cut_a_long_quote_into_windows():
     out = clauses(FED_QUOTE)
     assert out[0] == FED_QUOTE and len(out) > 1
     assert all(len(w.split()) <= 45 for w in out[1:])
+
+
+def test_running_headers_are_not_offered_as_sentences(tmp_path, monkeypatch):
+    import json as _json
+    from dalil import draft as draft_mod
+    bodies = ["A keeper must answer a request within thirty days of receiving it.",
+              "A record holder may refuse a request that would reveal another person's records.",
+              "The authority publishes a yearly report on the requests it has received.",
+              "Any person may complain to the authority about a refused request.",
+              "These rules take effect six months after they are published."]
+    pages = [{"page": n, "text": f"Sample Records Law of the Federation\n{n}\nArticle ({n})\n{bodies[n - 1]}\n"
+                                 f"{bodies[n - 1].replace('.', ' again.')}"}
+             for n in range(1, 6)]
+    docs = tmp_path / "documents.jsonl"
+    docs.write_text(_json.dumps({"doc_id": "sample-records-law", "kind": "pdf", "pages": pages}) + "\n")
+    monkeypatch.setattr(draft_mod, "running_lines", lambda: draft_mod._running_from(docs))
+    found = draft_mod._running_from(docs)["sample-records-law"]
+    assert "Sample Records Law of the Federation" in found
+    text = pages[1]["text"]
+    h = Hit(passage_id="sample-records-law:p2:1", doc_id="sample-records-law", page=2, score=12.0, heading=None,
+            text=text, start=0, end=len(text), kind="pdf")
+    offered = [s for _, s in LLMDrafter().numbered([h]).values()]
+    assert offered == [bodies[1], bodies[1].replace(".", " again.")]
