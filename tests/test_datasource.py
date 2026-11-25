@@ -509,3 +509,14 @@ def test_a_data_backed_claim_is_not_treated_as_stitched_from_documents(local):
     # Without a data value in the sentence the documents check still applies as before.
     plain = {"text": "Emirates Health Services carried out medical fitness exams.", "citations": [QUOTE, q2]}
     assert not v.check_answer([plain]).sentences[0].kept
+
+
+def test_an_arabic_claim_in_other_words_is_backed_by_the_rule_meaning():
+    from dalil.verify import support
+    rule = next(r for r in RULES if r.name == "tasheel_centres")
+    evidence = " ".join([rule.fact_ar.format(centres=49, emirates=7), rule.meaning])
+    assert support("عدد مراكز خدمة تسهيل في دولة الإمارات هو 49.", evidence) >= 0.8
+    assert support("المراكز موزعة في 7 إمارات.", evidence) >= 0.8
+    # A claim about something the data does not count still fails.
+    assert support("المراكز مغلقة يوم الجمعة.", evidence) < 0.5
+    assert all(r.meaning for r in RULES)

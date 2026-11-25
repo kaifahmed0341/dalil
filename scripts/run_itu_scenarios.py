@@ -63,8 +63,8 @@ class Tamper:
     def __init__(self, inner: Any):
         self.inner = inner
 
-    def draft(self, question, hits, data, notes=()):
-        out = self.inner.draft(question, hits, data, notes=notes)
+    def draft(self, question, hits, data, notes=(), **kwargs):
+        out = self.inner.draft(question, hits, data, notes=notes, **kwargs)
         for s in out:
             if s.get("kind") == "claim":
                 s["text"] = s["text"].rstrip(".") + " within 99 days."

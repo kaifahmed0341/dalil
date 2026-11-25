@@ -73,7 +73,8 @@ class LawRef:
         plain = _plain(text).casefold()
         if self.jurisdiction and self.jurisdiction in jurisdictions_named(text):
             return True
-        if re.search(rf"(?<!\d){re.escape(self.number)}(?!\d)", plain.translate(_DIGITS)):
+        from dalil.verify import law_numbers
+        if self.number in law_numbers(plain.translate(_DIGITS)):  # "No. 26", "Law 26", "رقم 26"
             return True
         return any(re.search(rf"\b{re.escape(a.casefold())}\b", plain) for a in self.aliases)
 
@@ -96,7 +97,9 @@ def law_ref(doc_id: str, title: str, topic: str = "") -> LawRef | None:
         # A topic such as "PDPL Federal Decree-Law 45 of 2021" can say what the title leaves out.
         topic_folded = _plain(topic).casefold()
         jurisdiction = next((j for j, words in JURISDICTIONS.items() if any(w in topic_folded for w in words)), "")
-    aliases = tuple(sorted(set(re.findall(r"\b[A-Z]{3,6}\b", topic or "")) - {"UAE", "AED", "ICP"}))
+    # A short name the manifest topic gives the law itself: "PDPL Federal Decree-Law 45".
+    aliases = tuple(sorted(set(re.findall(r"\b((?-i:[A-Z]{3,6}))\b(?=\s+(?:federal\s+)?(?:decree|law))",
+                                          topic or "", flags=re.IGNORECASE)) - {"UAE", "AED", "ICP"}))
     return LawRef(doc_id, title, jurisdiction, number.group(1), year.group(1), aliases)
 
 
@@ -108,11 +111,31 @@ def law_refs(rows: Iterable[Mapping[str, str]]) -> dict[str, LawRef]:
         ref = law_ref(doc_id(r["file"]), r.get("title", ""), r.get("topic", ""))
         if ref:
             out[ref.doc_id] = ref
-    return out
+    # The same law in two languages shares its short names: the Arabic PDPL's
+    # topic says "PDPL", and the English one is the same law.
+    by_key: dict[tuple[str, str, str], set[str]] = {}
+    for ref in out.values():
+        by_key.setdefault(ref.key, set()).update(ref.aliases)
+    from dataclasses import replace
+    return {d: replace(ref, aliases=tuple(sorted(by_key[ref.key]))) for d, ref in out.items()}
 
 
 _LAW_EN = r"(?:law|decree|decree-law|decree\s+by\s+law|act|legislation)"
 _LAW_AR = r"(?:قانون|القانون|مرسوم|المرسوم|تشريع|التشريع)"
+
+
+_NOT_A_LAW = re.compile(r"(?:الجهات|جهات|الحكومية|حكومية|الحكومة|حكومة|الهيئة|هيئة|المؤسسات|مؤسسات)$")
+
+
+def _arabic_law_of(plain: str, word: str) -> bool:
+    """An Arabic law noun qualified by a jurisdiction: "القانون الاتحادي",
+    "مرسوم بقانون اتحادي", "قانون ... لإمارة دبي". Not "الجهات الحكومية
+    الاتحادية", where the adjective qualifies the entities, not the law."""
+    for m in re.finditer(rf"{_LAW_AR}((?:\s+\S+){{0,3}}?)\s+(?:ل|في\s+|لإمارة\s+|إمارة\s+)?{word}(?![\u0621-\u064a])", plain):
+        between = m.group(1).split()
+        if not between or not _NOT_A_LAW.search(between[-1]):
+            return True
+    return False
 
 
 def jurisdictions_named(text: str) -> set[str]:
@@ -123,12 +146,12 @@ def jurisdictions_named(text: str) -> set[str]:
     plain = _plain(text).casefold()
     out = set()
     for j, words in {**JURISDICTIONS, "federal": (*JURISDICTIONS["federal"], "uae", "united arab emirates",
-                                                    "الإمارات", "الدولة")}.items():
+                                                    "الإمارات")}.items():
         for w in words:
             w = re.escape(w)
             if re.search(rf"\b{w}\b(?:\s+[\w'-]+){{0,3}}?\s+{_LAW_EN}\b", plain) \
                     or re.search(rf"\b{_LAW_EN}\b(?:\s+\S+){{0,4}}?\s+(?:of|in)\s+(?:the\s+)?(?:emirate\s+of\s+)?{w}\b", plain) \
-                    or re.search(rf"{_LAW_AR}(?:\s+\S+){{0,5}}?\s+\S*{w}", plain):
+                    or _arabic_law_of(plain, w):
                 out.add(j)
     return out
 

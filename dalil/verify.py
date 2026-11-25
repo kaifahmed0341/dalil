@@ -94,14 +94,56 @@ _NUMBER_WORD = re.compile(
     re.IGNORECASE)
 
 
+# Arabic number words, in the normalised form tokenize() makes (alef forms
+# unified, ta marbuta as ha, alef maqsura as ya), with their values. A word
+# may carry a prefix such as و or ب; tokenize() strips the article.
+_AR_NUMBER_WORDS: dict[str, int] = {}
+for _value, _forms in {
+    1: "واحد واحده", 2: "اثنان اثنين اثنتان اثنتين يومين شهرين عامين سنتين", 3: "ثلاث ثلاثه", 4: "اربع اربعه",
+    5: "خمس خمسه", 6: "ست سته", 7: "سبع سبعه", 8: "ثماني ثمانيه ثمان", 9: "تسع تسعه", 10: "عشر عشره",
+    20: "عشرون عشرين", 30: "ثلاثون ثلاثين", 40: "اربعون اربعين", 50: "خمسون خمسين", 60: "ستون ستين",
+    70: "سبعون سبعين", 80: "ثمانون ثمانين", 90: "تسعون تسعين", 100: "مائه مئه", 200: "مائتان مائتين مئتان مئتين",
+    300: "ثلاثمائه ثلاثمئه", 400: "اربعمائه اربعمئه", 500: "خمسمائه خمسمئه", 600: "ستمائه ستمئه",
+    700: "سبعمائه سبعمئه", 800: "ثمانمائه ثمانمئه", 900: "تسعمائه تسعمئه",
+    1000: "الف", 2000: "الفان الفين الفا الفي", 1000000: "مليون", 1000000000: "مليار",
+}.items():
+    for _form in _forms.split():
+        _AR_NUMBER_WORDS[_form] = _value
+
+
+# Dual nouns of time: "أسبوعين" is two weeks.
+for _form in "اسبوعين ساعتين دقيقتين ليلتين".split():
+    _AR_NUMBER_WORDS[_form] = 2
+# Any other word built on these is a number the table does not know, such as
+# "آلاف" (thousands) after a count. It is kept as itself, so the check fails
+# closed: the claim is cut unless its source uses the same word.
+_AR_LARGE = re.compile("مائه|مئه|الاف|الف|مليون|ملايين|مليار")
+
+
+def _arabic_number_words(text: str) -> set[str]:
+    from dalil.retrieve import tokenize
+    out = set()
+    for token in tokenize(text, stem=False):  # whole words: the stemmer would cut "آلاف" to "اف"
+        bare = token[1:] if len(token) > 3 and token[0] in "وبلف" else token
+        forms = [token, bare, *(w[2:] for w in (token, bare) if w.startswith("ال") and len(w) > 4)]
+        known = next((w for w in forms if w in _AR_NUMBER_WORDS), None)
+        if known:
+            out.add(str(_AR_NUMBER_WORDS[known]))
+        elif _AR_LARGE.search(token):
+            out.add(token)
+    return out
+
+
 def numbers(text: str) -> set[str]:
     """Numbers in `text`, with grouping commas removed, so 1,000 matches 1000.
 
     Numbers written as words count too: "fifty" is 50 and "twenty-one" is 21,
-    so a model cannot get a number past the check by spelling it out.
+    in Arabic as in English ("ثلاثون" is 30), so a model cannot get a number
+    past the check by spelling it out.
     """
     text = unicodedata.normalize("NFKC", text).translate(_ARABIC_DIGITS)
     found = {m.group(0).replace(",", "") for m in _NUMBER.finditer(text)}
+    found |= _arabic_number_words(text)
     for m in _NUMBER_WORD.finditer(text):
         if m.group(1):
             found.add(str(_TENS[m.group(1).lower()] + _UNITS[m.group(2).lower()]))
@@ -127,7 +169,7 @@ def law_numbers(text: str) -> set[str]:
 # an English source's "not".
 _NEGATIONS = frozenset("not no never cannot can't don't doesn't isn't aren't won't wasn't weren't "
                        "shouldn't mustn't without nor none neither unable "
-                       "لا ولا لم ولم لن ولن ليس ليست وليس غير دون بدون عدم بعدم".split())
+                       "لا ولا لم ولم لن ولن ليس ليست ليسوا لست وليس غير دون بدون عدم بعدم".split())
 # Share of a claim's key words that must appear in its evidence.
 SUPPORT_MIN = 0.6
 # For a claim in another language than its sources, where words cannot be
@@ -141,7 +183,10 @@ CONTEXT_CHARS = 200
 
 
 def _words(text: str) -> set[str]:
-    return set(re.findall(r"[a-z']+|[\u0621-\u064a]+", unicodedata.normalize("NFKC", text).lower().translate(_FOLD)))
+    from dalil.retrieve import normalise_arabic
+    # Arabic vowel marks are dropped first, so "لَا" is read as "لا".
+    plain = normalise_arabic(unicodedata.normalize("NFKC", text).lower().translate(_FOLD))
+    return set(re.findall(r"[a-z']+|[\u0621-\u064a]+", plain))
 
 
 def clauses(text: str, size: int = 30) -> list[str]:
@@ -157,6 +202,23 @@ def clauses(text: str, size: int = 30) -> list[str]:
         else:
             out += [" ".join(words[i:i + size]) for i in range(0, len(words) - size // 2, size // 2)]
     return list(dict.fromkeys(out))
+
+
+# Arabic words that negate only sometimes: "غير الحكومية" is "non-governmental"
+# and "دون سن" is "under the age of".
+_AR_SOFT_NEGATIONS = frozenset({"غير", "دون"})
+_SOFT_BACKING = frozenset({"non", "under", "below", "except", "less", "without", "other"})
+
+
+def _negations(words: set[str]) -> set[str]:
+    """Negation words, also with one attached و, ف or ب: "فلا", "وبدون"."""
+    found = set()
+    for w in words:
+        for form in (w, w[1:] if len(w) > 2 and w[0] in "وفب" else w):
+            if form in _NEGATIONS:
+                found.add(form)
+                break
+    return found
 
 
 def _script(text: str) -> str:
@@ -436,8 +498,12 @@ class Verifier:
                                               "single document: " + ", ".join(missing))
             # Negations count as one class: "cannot" is backed by a source's "will not".
             # "No." in "Law No. 45" is a law reference, not a negation.
-            added = sorted(_words(_LAW_NUMBER.sub(" ", text)) & _NEGATIONS)
-            if result.kept and added and not (_words(evidence) & _NEGATIONS):
+            added = sorted(_negations(_words(_LAW_NUMBER.sub(" ", text))))
+            backing = _negations(_words(evidence))
+            if set(added) <= _AR_SOFT_NEGATIONS:
+                # "غير" is often "non-" and "دون" "under"; English that says so backs them.
+                backing |= _words(evidence) & _SOFT_BACKING
+            if result.kept and added and not backing:
                 result.kept = False
                 result.reasons.append("claim adds a negation its sources do not have: " + ", ".join(added))
         return result

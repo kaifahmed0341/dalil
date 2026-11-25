@@ -21,15 +21,21 @@ export DALIL_LLM_URL="http://127.0.0.1:$DALIL_LLM_PORT/v1" DALIL_EMBED_URL="http
 export HF_HUB_OFFLINE=1 ANONYMIZED_TELEMETRY=False UV_OFFLINE=1
 mkdir -p "$ROOT/build/run"
 pids=()
-trap 'kill "${pids[@]}" 2>/dev/null; wait 2>/dev/null' EXIT INT TERM
+trap '[ ${#pids[@]} -gt 0 ] && kill "${pids[@]}" 2>/dev/null; wait 2>/dev/null' EXIT INT TERM
 
 wait_for() { # name url
   for _ in $(seq 1 300); do curl -sf -m 2 "$2" >/dev/null && { echo "$1: up"; return; }; sleep 0.5; done
   echo "$1 did not start; see build/run/$1.log" >&2; exit 1
 }
 
-MODEL="$EMBED_MODEL" "$ROOT/scripts/serve_nemotron_embed.sh" >"$ROOT/build/run/embed.log" 2>&1 & pids+=($!)
-MODEL="$LLM_MODEL" "$ROOT/scripts/serve_nemotron.sh" >"$ROOT/build/run/llm.log" 2>&1 & pids+=($!)
+# A model server already answering on its port is used as it is, and left running.
+up() { curl -sf -m 2 "$1" >/dev/null 2>&1; }
+if up "http://127.0.0.1:$DALIL_EMBED_PORT/health"; then echo "embed: already up on $DALIL_EMBED_PORT"; else
+  MODEL="$EMBED_MODEL" "$ROOT/scripts/serve_nemotron_embed.sh" >"$ROOT/build/run/embed.log" 2>&1 & pids+=($!)
+fi
+if up "http://127.0.0.1:$DALIL_LLM_PORT/health"; then echo "llm: already up on $DALIL_LLM_PORT"; else
+  MODEL="$LLM_MODEL" "$ROOT/scripts/serve_nemotron.sh" >"$ROOT/build/run/llm.log" 2>&1 & pids+=($!)
+fi
 wait_for embed "http://127.0.0.1:$DALIL_EMBED_PORT/health"
 wait_for llm "http://127.0.0.1:$DALIL_LLM_PORT/health"
 cd "$ROOT"
