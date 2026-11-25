@@ -16,7 +16,8 @@ A sentence is kept only if all of these hold:
    a column, and rerunning it through `data_lookup` returns the value in
    that column.
 4. Every number in the sentence appears in one of its verified quotes, the
-   heading of a cited passage, or a data value. A model that writes "AED 1,500" over a quote saying
+   heading of a cited passage, or a data value: the cited value or another
+   value in the same row the rerun returned. A model that writes "AED 1,500" over a quote saying
    "AED 1,000" loses the sentence.
 
 "Word for word" forgives only what a copy-paste or a line break changes:
@@ -36,6 +37,7 @@ from __future__ import annotations
 
 import json
 import re
+import string
 import unicodedata
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -372,7 +374,8 @@ class Verifier:
                  allowed_passages: Iterable[str] | None = None, titles: Mapping[str, str] | None = None,
                  laws: Mapping[str, Any] | None = None,
                  similarity: Callable[[str, list[str]], list[float] | None] | None = None,
-                 question: str = "", subjects: Mapping[str, str] | None = None, language: str = ""):
+                 question: str = "", subjects: Mapping[str, str] | None = None, language: str = "",
+                 data_facts: Mapping[str, str] | None = None):
         """`allowed_sql`: the queries the pipeline itself ran. A data citation must
         name one of them exactly, so a drafter cannot write its own SQL, such as
         `SELECT 1500 AS fee`, to back a number. `allowed_uncited`: the fixed
@@ -386,6 +389,9 @@ class Verifier:
         self.allowed_sql = None if allowed_sql is None else {fold(q)[0] for q in allowed_sql}
         self.allowed_uncited = None if allowed_uncited is None else {fold(t)[0] for t in allowed_uncited}
         self.allowed_passages = None if allowed_passages is None else set(allowed_passages)
+        # query -> the fixed sentence that says what its row means (dalil/opendata.py),
+        # such as "... counts {exams} residency medical fitness exams in {year}."
+        self.data_facts = {fold(q)[0]: f for q, f in (data_facts or {}).items() if f}
         # doc_id -> document title. A title such as "Federal Decree by Law No.
         # (45) of 2021" backs the law's own number and year in a claim.
         self.titles = dict(titles or {})
@@ -446,7 +452,16 @@ class Verifier:
         matched = frozenset(i for i, row in enumerate(rows)
                             if row.get(column) is not None and want == fold(str(row[column]))[0])
         if matched:
-            return CitationCheck(True, "value returned by the query", cit, evidence=str(value), rows=matched)
+            # The rerun returned the whole row, so its other values are verified
+            # too: "1424313 exams in 2025" may cite the count alone when the year
+            # sits in the same returned row. Only rows holding the cited value count.
+            same_row = [str(rows[i][k]) for i in sorted(matched) for k in rows[i]
+                        if k != column and rows[i][k] is not None]
+            # The rule's own sentence, filled from the rerun row, says what the
+            # value means, so a claim in other words can be checked against it.
+            meaning = _fill(self.data_facts.get(fold(sql)[0]), rows[min(matched)])
+            return CitationCheck(True, "value returned by the query", cit,
+                                 evidence=" ".join([str(value), *same_row, meaning]), rows=matched)
         return CitationCheck(False, f"query did not return the cited value in column {column!r}", cit)
 
     def check_sentence(self, sentence: Mapping[str, Any]) -> SentenceCheck:
@@ -494,6 +509,15 @@ class Verifier:
                 result.kept = False
                 result.reasons.append("data values come from different rows")
         quotes = [c.evidence for c in result.citations if c.ok and c.doc_id]
+        backing = [c.evidence for c in result.citations if c.ok and c.rows]
+        if result.kept and backing and not quotes and self.data_facts:
+            # Backed by open data alone: the claim's key words must mostly be in
+            # what the lookup counts (the rule's fact and meaning), as a reworded
+            # passage claim must be in its quotes.
+            share = support(text, " ".join(backing))
+            if share < SUPPORT_MIN:
+                result.kept = False
+                result.reasons.append(f"claim is not supported by its data (key words found: {share:.0%})")
         if result.kept and quotes:
             # A drafter may reword its sources. The claim's key words must mostly
             # be in them, and it may not add a negation they lack.
@@ -613,6 +637,13 @@ class Verifier:
         asked = {t for t in tokenize(claim) if not t.isdigit()} & set(tokenize(self.question))
         if not asked:
             return []
+        # A claim that states a value its data citation reran answers from that
+        # lookup, not from documents joined together; its wording is still
+        # checked against its sources and the rule's own sentence above.
+        stated = numbers(claim)
+        if any(c.ok and c.citation.get("sql") and numbers(str(c.citation.get("value") or "")) <= stated
+               and numbers(str(c.citation.get("value") or "")) for c in citations):
+            return []
         by_doc: dict[str, set[str]] = {}
         for c in citations:
             if c.ok and c.doc_id:
@@ -708,7 +739,7 @@ class Verifier:
         return AnswerCheck(status, checks)
 
 
-# --- rerunning data citations through Zetaris --------------------------------
+# --- rerunning data citations on the open-data source --------------------------
 
 _WRITE_WORDS = re.compile(
     r"\b(insert|update|delete|merge|drop|create|alter|truncate|grant|revoke|cache|uncache|"
@@ -717,11 +748,21 @@ _CALL = re.compile(r"\b(?:java_method|reflect|input_file_name|current_user|sessi
 _TABLE_REF = re.compile(r"\b(?:from|join)\s+([A-Za-z_][\w.]*)", re.IGNORECASE)
 
 
+def _fill(template: str | None, row: Mapping[str, Any]) -> str:
+    """A fact template with its {column} slots filled from a row, or "" if any is missing."""
+    if not template:
+        return ""
+    slots = [f for _, f, _, _ in string.Formatter().parse(template) if f]
+    if any(row.get(s) in (None, "") for s in slots):
+        return ""
+    return template.format(**{s: row[s] for s in slots})
+
+
 def safe_select(sql: str, allowed_schema: str = "dalil") -> str:
     """Return `sql` if it is one read-only SELECT over `allowed_schema` tables.
 
     A drafted answer's data citation carries SQL the model wrote, so the
-    checker refuses anything else before it reaches Zetaris.
+    checker refuses anything else before it reaches the data source.
     """
     s = sql.strip().rstrip(";").strip()
     if any(ch in s for ch in "`\""):
@@ -744,8 +785,13 @@ def safe_select(sql: str, allowed_schema: str = "dalil") -> str:
     return s
 
 
-def zetaris_lookup(client: Any, allowed_schema: str = "dalil") -> DataLookup:
-    """A DataLookup that reruns a citation's SQL on Zetaris, read-only."""
+def data_lookup(source: Any, allowed_schema: str = "dalil") -> DataLookup:
+    """A DataLookup that reruns a citation's SQL on the open-data source,
+    Zetaris or the local database (dalil.datasource), read-only."""
     def lookup(sql: str) -> list[dict[str, Any]]:
-        return client.sql(safe_select(sql, allowed_schema), limit=200).dicts()
+        return source.sql(safe_select(sql, allowed_schema), limit=200).dicts()
     return lookup
+
+
+# The old name: the checker's rerun was Zetaris-only when it was written.
+zetaris_lookup = data_lookup

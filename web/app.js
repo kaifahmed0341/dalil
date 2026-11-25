@@ -101,6 +101,8 @@
     passport: "a passport number",
     phone: "a phone number",
     email: "an email address",
+    national_insurance: "a National Insurance number",
+    nhs_number: "an NHS number",
   };
   function flagCode(flag) {
     return String(typeof flag === "string" ? flag : (flag && (flag.kind || flag.code || flag.type)) || "").toLowerCase();
@@ -371,6 +373,8 @@
     review: (id, body) => http("POST", "/api/questions/" + encodeURIComponent(id) + "/review", body),
     page: (doc, page) => http("GET", "/api/documents/" + encodeURIComponent(doc) + "/pages/" + encodeURIComponent(page)),
     fileUrl: (doc) => "/api/documents/" + encodeURIComponent(doc) + "/file",
+    knowledgeBases: () => http("GET", "/api/knowledge-bases"),
+    switchKnowledgeBase: (id) => http("POST", "/api/knowledge-base", { id }),
   };
 
   function mockApi() {
@@ -437,6 +441,12 @@
         return copy(p);
       },
       fileUrl: () => null,
+      knowledgeBases: async () => {
+        await ready;
+        const kb = fx.health.knowledge_base || { id: "sample", name: "Sample knowledge base", documents: null, passages: fx.health.passages };
+        return [Object.assign({ active: true, loaded: true }, kb)];
+      },
+      switchKnowledgeBase: async () => { throw new Error("Sample data has one knowledge base."); },
     };
   }
 
@@ -451,6 +461,7 @@
     activeCite: null, // number
     pages: new Map(),
     pollTimer: null,
+    kbSwitches: 0,    // counts knowledge-base switches, so an answer from before one is not shown after it
     busy: false,
     asking: null,
     sourceToken: 0,
@@ -506,9 +517,60 @@
         h("p", { class: "health-line" },
           h("span", { class: "dot " + (ds.on ? "dot-on" : "dot-off"), "aria-hidden": "true" }),
           h("span", { class: "health-key" }, ds.label), h("span", { class: "health-val" }, ds.detail)));
+      // Each knowledge base names its own country in the ask box.
+      const kbInfo = hl.knowledge_base;
+      if (kbInfo && kbInfo.ask_label) $("ask-label").textContent = kbInfo.ask_label;
+      if (kbInfo && kbInfo.example_question) $("ask-input").placeholder = kbInfo.example_question;
     } catch (e) {
       el.append(h("p", { class: "health-line health-warn" }, "Dalil's server on this computer is not answering. Start it, then reload this page."));
     }
+  }
+
+  // ---------- knowledge base ----------
+  // The header line under the menu gives the active one's counts, so the menu shows names only.
+  function kbLabel(k) { return k.name || k.id; }
+
+  async function loadKnowledgeBases() {
+    const sel = $("kb-select");
+    try {
+      const list = await api.knowledgeBases();
+      clear(sel);
+      for (const k of list) sel.append(h("option", { value: k.id, selected: k.active }, kbLabel(k)));
+      sel.disabled = list.length < 2;
+    } catch (e) {
+      sel.disabled = true;
+    }
+  }
+
+  async function switchKnowledgeBase(e) {
+    const sel = e.target;
+    const id = sel.value;
+    sel.disabled = true;
+    notify(null);
+    const el = clear($("health"));
+    el.append(h("p", { class: "health-line" }, h("span", { class: "dot dot-off", "aria-hidden": "true" }),
+      h("span", { class: "health-key" }, "Switching knowledge base")));
+    try {
+      await api.switchKnowledgeBase(id);
+      // Questions belong to the knowledge base that answered them: start from its own queue.
+      // A question still being answered on the old one finishes there, and is not shown here.
+      state.kbSwitches++;
+      state.asking = null;
+      stopPoll();
+      state.selectedId = null;
+      state.record = null;
+      state.cites = [];
+      state.activeCite = null;
+      history.replaceState(null, "", location.pathname + location.search);
+      renderRecord();
+      renderSourceEmpty();
+      clear($("searched"));
+      await Promise.all([loadHealth(), loadQueue()]);
+    } catch (err) {
+      notify("Could not switch the knowledge base. " + err.message);
+      loadHealth();
+    }
+    await loadKnowledgeBases();
   }
 
   // ---------- queue ----------
@@ -1113,8 +1175,10 @@
       h("p", null, "Its steps appear here as soon as the screener has read it."));
     $("answer-empty").hidden = false;
     watchForNew(asking);
+    const switches = state.kbSwitches;
     try {
       const res = await api.ask(question);
+      if (state.kbSwitches !== switches) { await loadQueue(); return; }  // switched while it was answered
       state.asking = null;
       input.value = "";
       notify(null);
@@ -1172,6 +1236,8 @@
     $("review-form").addEventListener("submit", (e) => e.preventDefault());
     initTabs();
     if (MOCK) document.title = "Dalil reviewer (sample data)";
+    $("kb-select").addEventListener("change", switchKnowledgeBase);
+    loadKnowledgeBases();
     loadHealth();
     await loadQueue();
     const fromHash = decodeURIComponent(location.hash.slice(1));

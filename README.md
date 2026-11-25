@@ -81,7 +81,7 @@ Nothing in the code names a UAE document. To point Dalil at another country's se
 | Digital government | Digital Government Strategy 2025; National Policy for Digital Accessibility (2024); the citizen charter; the digital customer and digital government service policy and the unified digital platform policy (2021, Arabic) |
 | Driving, health, business | Driving licences; vehicle registration; health insurance by emirate; starting a business on the mainland and in a free zone |
 
-Four open datasets from Bayanat, the UAE open data portal, add the numbers behind some services. They are in `data/open/` under CC BY 4.0.
+Four open datasets from Bayanat, the UAE open data portal, add the numbers behind some services. They are in `data/open/` under CC BY 4.0 and CC BY-SA 4.0, file by file in [data/open/README.md](data/open/README.md). Dalil queries them through Zetaris when it is configured and answers, and otherwise from a read-only SQLite copy it loads from those files at start, checked against their SHA-256; `DALIL_OPEN_DATA` (`auto`, `zetaris`, `local` or `off`) picks the source, and `scripts/check_open_data.py` checks it.
 
 ## The seven ITU scenarios
 
@@ -142,7 +142,7 @@ DALIL_CORPUS_DIR=/path/to/corpus \
 scripts/run_offline.sh            # the reviewer screen on http://127.0.0.1:8787; Ctrl-C stops everything
 ```
 
-Everything listens on 127.0.0.1 only. The open-data service is optional; without it the screen says so and answers come from the documents alone. The screen also runs on invented sample data with no backend: serve `web/` and open it with `?mock=1`.
+Everything listens on 127.0.0.1 only. Zetaris is optional: without it the open data comes from the local SQLite copy, and the screen's header and each data citation say which source answered. The screen also runs on invented sample data with no backend: serve `web/` and open it with `?mock=1`.
 
 ## Tests
 
@@ -164,7 +164,7 @@ A 4B model writes the drafts, so it sometimes picks a true sentence that does no
 | NVIDIA | Nemotron 3 Nano 4B drafts and Nemotron-3-Embed-1B searches, both run locally through llama.cpp |
 | ITU | The `KnowledgeBase` class, ChromaDB collections and readiness framework loader, vendored unchanged in `itu/reference/` under MIT |
 | Meterless | H-MEM, the review memory, vendored unchanged in `hmem/reference/` |
-| Zetaris | Federated SQL over the open datasets, when it is reachable |
+| Zetaris | Federated SQL over the open datasets, when it is reachable; otherwise the same fixed queries run on SQLite from the Python standard library |
 | Claude Code | Wrote the code; see [docs/tool-log.md](docs/tool-log.md) |
 
 ## Licence

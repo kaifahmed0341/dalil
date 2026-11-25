@@ -11,15 +11,18 @@ through the store (or the HTTP app).
 
 from __future__ import annotations
 
+import os
+import re
 import sys
 
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, Mapping
 
 from dalil import lang, safety
-from dalil.draft import FEE_CAVEAT, LAW_CAVEAT, WEAK_REFUSAL, Drafter, ExtractiveDrafter, caveat, refusal
-from dalil.opendata import DataResult, match_rules, run_rules
+from dalil.draft import (FEE_CAVEAT, LAW_CAVEAT, WEAK_REFUSAL, Drafter, ExtractiveDrafter, caveat, data_claims,
+                         refusal)
+from dalil.opendata import RULES, DataResult, match_rules, run_rules
 from dalil.retrieve import Hit, Searcher, make_retriever, tokenize
 from dalil.store import Store
 from dalil.hmem import Guidance, guidance
@@ -28,7 +31,7 @@ from dalil.subjects import names_subject, subject_docs, title_terms
 
 # Words for the person who holds a service, not for what is asked about it.
 _ROLE_WORDS = frozenset(tokenize("holder holders owner owners applicant applicants resident residents person people"))
-from dalil.verify import Verifier, load_passages, zetaris_lookup
+from dalil.verify import Verifier, data_lookup, load_passages
 
 def cited_passages(check: dict[str, Any] | None) -> list[str]:
     """Passage ids the kept sentences of a checked answer cite."""
@@ -36,21 +39,22 @@ def cited_passages(check: dict[str, Any] | None) -> list[str]:
                    for c in s.get("citations", []) if c.get("passage_id")})
 
 
-def document_titles() -> dict[str, str]:
+def document_titles(manifest: Path | str | None = None) -> dict[str, str]:
     """doc_id -> title from the manifest, or nothing if it cannot be read."""
     from dalil.corpus import doc_id, load_manifest
     try:
-        return {doc_id(r["file"]): r.get("title", "") for r in load_manifest()}
+        rows = load_manifest(manifest) if manifest else load_manifest()
+        return {doc_id(r["file"]): r.get("title", "") for r in rows}
     except Exception as e:
         print(f"warning: no document titles for the checker ({type(e).__name__})", file=sys.stderr)
         return {}
 
 
-def manifest_laws() -> dict[str, Any]:
+def manifest_laws(manifest: Path | str | None = None) -> dict[str, Any]:
     """doc_id -> LawRef for every numbered law in the manifest, or nothing."""
     from dalil.corpus import load_manifest
     try:
-        return law_refs(load_manifest())
+        return law_refs(load_manifest(manifest) if manifest else load_manifest())
     except Exception as e:
         print(f"warning: no law list for the checker ({type(e).__name__})", file=sys.stderr)
         return {}
@@ -96,44 +100,115 @@ def default_zetaris() -> Any:
     return z.Client(timeout=ZETARIS_TIMEOUT)
 
 
+class NoSource(RuntimeError):
+    """Raised by default_data_source when no open-data source is available."""
+
+
+def default_data_source() -> Any:
+    """The open-data source DALIL_OPEN_DATA picks (dalil.datasource), or raise
+    NoSource with the reason. Zetaris when configured and answering, else the
+    local database, by default."""
+    from dalil import datasource
+
+    source, why = datasource.resolve(zetaris_timeout=ZETARIS_TIMEOUT)
+    if source is None:
+        raise NoSource(why)
+    if why:  # auto mode fell back to the local database
+        print(f"open data: {why}", file=sys.stderr)
+    return source
+
+
 class Pipeline:
     def __init__(self, store: Store, retriever: Searcher, passages: dict[str, dict[str, Any]],
                  drafter: Drafter | None = None,
-                 zetaris_factory: Callable[[], Any] | None = default_zetaris, k: int = K,
-                 memory: Any = None, redraft: bool = True):
+                 zetaris_factory: Callable[[], Any] | None = default_data_source, k: int = K,
+                 memory: Any = None, screener: safety.Screener | None = None,
+                 rules: tuple[Any, ...] = RULES, manifest: Path | str | None = None, redraft: bool = True):
         self.store = store
         self.retriever = retriever
         self.passages = passages
         self.drafter = drafter or ExtractiveDrafter()
+        # Builds the open-data source: anything with sql(statement, limit) whose
+        # result has dicts(). The name is kept from when only Zetaris existed.
         self.zetaris_factory = zetaris_factory
         self.k = k
         self._zetaris: Any = None
         # Review memory (dalil.hmem.HMem or a stand-in with recall()); None turns it off.
         self.memory = memory
+        # The knowledge base's own ID formats and fixed sentences (dalil/kb.py).
+        self.screener = screener or safety.DEFAULT_SCREENER
+        self.fixed_uncited = lang.all_fixed({WEAK_REFUSAL, FEE_CAVEAT, LAW_CAVEAT, *self.screener.fixed_texts.values()})
+        # Open-data rules that apply to this knowledge base; () for none.
+        self.rules = tuple(rules)
         # When the checker cuts every claim the model wrote, quote the sources
         # with the extractive drafter instead of holding an empty answer.
         self.redraft = redraft
-        self.titles = document_titles()
-        self.laws = manifest_laws()
+        self.titles = document_titles(manifest)
+        self.laws = manifest_laws(manifest)
 
     @classmethod
     def from_build(cls, store: Store | None = None, passages_path: Path | str = DEFAULT_PASSAGES,
                    **kwargs: Any) -> "Pipeline":
         return cls(store or Store(), make_retriever(passages_path), load_passages(passages_path), **kwargs)
 
-    def zetaris(self) -> tuple[Any, str]:
-        """The Zetaris client and "", or None and why it is unavailable."""
+    @classmethod
+    def from_profile(cls, profile: Any, store: Store | None = None, **kwargs: Any) -> "Pipeline":
+        """A pipeline over one knowledge-base profile (dalil.kb.Profile): its
+        passages, store, screener, manifest and open data."""
+        from dalil import datasource
+
+        if profile.open_data_dir is None:
+            factory = None
+        else:
+            def factory() -> Any:
+                env = {**os.environ, "DALIL_OPEN_DATA_DIR": str(profile.open_data_dir)}
+                source, why = datasource.resolve(env, zetaris_timeout=ZETARIS_TIMEOUT)
+                if source is None:
+                    raise NoSource(why)
+                if why:
+                    print(f"open data: {why}", file=sys.stderr)
+                return source
+        kwargs.setdefault("zetaris_factory", factory)
+        kwargs.setdefault("screener", profile.screener)
+        kwargs.setdefault("rules", RULES if profile.open_data_rules else ())
+        kwargs.setdefault("manifest", profile.manifest)
+        return cls.from_build(store or Store(profile.store), passages_path=profile.passages, **kwargs)
+
+    def data_source(self) -> tuple[Any, str]:
+        """The open-data source and "", or None and why it is unavailable."""
         if self._zetaris is not None:
             return self._zetaris, ""
         if self.zetaris_factory is None:
-            return None, "Zetaris not configured; lookup skipped"
+            return None, "Open data not configured; lookup skipped"
         try:
-            client = self.zetaris_factory()
-            client.sql("SELECT 1")
-        except Exception as e:  # ZetarisError messages carry no credentials
-            return None, f"Zetaris unreachable; lookup skipped ({type(e).__name__}: {str(e)[:160]})"
-        self._zetaris = client
-        return client, ""
+            source = self.zetaris_factory()
+            source.sql("SELECT 1")
+        except NoSource as e:
+            return None, str(e)
+        except Exception as e:  # neither source puts credentials in its messages
+            return None, f"Open data source unreachable; lookup skipped ({type(e).__name__}: {str(e)[:160]})"
+        self._zetaris = source
+        return source, ""
+
+    # The old name, for callers written before the local database existed.
+    zetaris = data_source
+
+    def data_source_status(self) -> dict[str, Any]:
+        """The health endpoint's data_source block. A cached source that stops
+        answering is dropped, so the next question resolves again (in auto
+        mode, Zetaris down means the local database takes over)."""
+        from dalil import datasource
+
+        if self.zetaris_factory is None and not self.rules:
+            # A knowledge base with no open data at all, such as kb/uk.
+            return {**datasource.status(None), "label": "Open data: none for this knowledge base"}
+        source, _ = self.data_source()
+        out = datasource.status(source)
+        if source is not None and not out["connected"]:
+            self._zetaris = None
+            source, _ = self.data_source()
+            out = datasource.status(source)
+        return out
 
     def recall(self, qid: str, question: str, english: str = "") -> Guidance:
         """Reviews of similar questions, from the review memory, and log what was used."""
@@ -273,7 +348,7 @@ class Pipeline:
                    text=p["text"], start=int(p["start"]), end=int(p["end"]), kind=p.get("kind") or "")
 
     def answer(self, question: str) -> Record:
-        screened = safety.screen(question)
+        screened = self.screener.screen(question)
         # From here on only the redacted text exists.
         qid = self.store.create_question(screened.redacted_question, screened.flags)
         self.store.event(qid, "screened", {"flags": screened.flags})
@@ -290,16 +365,17 @@ class Pipeline:
         hits: list[Hit] = []
         english = ""  # the question in English, when it was asked in another language
         data: list[DataResult] = []
+        rules: list[Any] = []
         client = None
         if screened.is_rule_evasion:
             self.store.event(qid, "retrieved", {"skipped": "rule_evasion", "hits": 0})
-            draft = [refusal(safety.REFUSAL_TEXT), refusal(safety.REFUSAL_FOLLOW_UP)]
+            draft = [refusal(self.screener.refusal_text), refusal(self.screener.refusal_follow_up)]
         elif screened.is_vague:
             # Too few key words to know the subject: ask, rather than guess.
             self.store.event(qid, "retrieved", {"skipped": "vague_question", "hits": 0})
-            draft = [refusal(safety.ASK_FOR_DETAIL)]
+            draft = [refusal(self.screener.ask_for_detail)]
             if screened.has_personal_data:
-                draft.append(caveat(safety.PERSONAL_DATA_CAVEAT))
+                draft.append(caveat(self.screener.personal_data_caveat))
         else:
             english = self.english_query(qid, q)
             past = self.recall(qid, q, english)
@@ -308,19 +384,23 @@ class Pipeline:
                 "k": self.k, "hits": len(hits),
                 "top": [{"passage_id": h.passage_id, "score": round(h.score, 3)} for h in hits[:3]],
             })
-            rules = match_rules(q)
+            rules = match_rules(q, self.rules)
             if rules:
-                client, why = self.zetaris()
+                client, why = self.data_source()
                 run = (lambda sql: client.sql(sql, limit=200).dicts()) if client else None
-                data = run_rules(rules, run, why)
+                kind = _kind(client)
+                data = run_rules(rules, run, why, source=kind)
+                if client is not None and all(d.note.startswith("lookup failed") for d in data):
+                    self._zetaris = None  # resolve again next time; auto mode can fall back
                 self.store.event(qid, "data_looked_up", {
+                    "source": kind or None,
                     "tables": [d.table for d in data],
                     "rows": [len(d.rows) for d in data],
                     "notes": [d.note for d in data if d.note],
                 })
             draft = self.drafter.draft(q, hits, data, notes=past.notes, **({"english": english} if english else {}))
             if screened.has_personal_data:
-                draft = [*draft, caveat(safety.PERSONAL_DATA_CAVEAT)]
+                draft = [*draft, caveat(self.screener.personal_data_caveat)]
         # Fixed refusals and caveats go out in the question's language.
         question_lang = lang.language(q)
         draft = [{**s, "text": lang.fixed(s["text"], question_lang)} if s.get("kind") in ("refusal", "caveat") else s
@@ -333,17 +413,32 @@ class Pipeline:
             "sentences": len(draft),
             "kinds": [s.get("kind", "claim") for s in draft],
         })
+        draft = facts_in_language(draft, data, question_lang)
+        drafted = len(draft)
+        draft = drop_repeats(draft, data)
+        repeats = drafted - len(draft)
+        drafted = len(draft)
+        draft = drop_internal_names(draft, data)
+        internal = drafted - len(draft)
+        draft, attached = attach_data(draft, data)
+        draft, unrelated = drop_unrelated_passages(draft, data)
         if client is None and any("sql" in c for s in draft for c in s.get("citations") or []):
-            client, _ = self.zetaris()
+            client, _ = self.data_source()
         subjects = {d: self.titles[d] for d in subject_docs(english or q, self.titles)
                     if any(h.doc_id == d for h in hits)}
-        verifier = Verifier(self.passages, zetaris_lookup(client) if client else None,
-                            allowed_sql=[d.sql for d in data], allowed_uncited=FIXED_UNCITED,
+        verifier = Verifier(self.passages, data_lookup(client) if client else None,
+                            allowed_sql=[d.sql for d in data], allowed_uncited=self.fixed_uncited,
                             allowed_passages=[h.passage_id for h in hits], titles=self.titles, laws=self.laws,
                             similarity=getattr(self.retriever, "similarities", None), question=english or q,
                             language=question_lang,
-                            subjects=subjects)
+                            subjects=subjects,
+                            data_facts={d.sql: " ".join(f for f in (d.fact, d.fact_ar, d.meaning) if f)
+                                        for d in data if d.fact})
         check = verifier.check_answer(draft).to_dict()
+        added = restate_data(draft, check, data, question_lang, counted=counted_lookups(q, english, rules))
+        if added:
+            draft = added
+            check = verifier.check_answer(draft).to_dict()
         # Only for English questions: the extractive drafter matches words, and
         # most sources are English, so for another language it finds the few
         # documents in that language whether or not they answer.
@@ -355,7 +450,7 @@ class Pipeline:
             # Quote from the page the question is about, when it names one.
             redraft = ExtractiveDrafter().draft(q, [h for h in hits if h.doc_id in subjects] or hits, data)
             if screened.has_personal_data:
-                redraft = [*redraft, caveat(safety.PERSONAL_DATA_CAVEAT)]
+                redraft = [*redraft, caveat(self.screener.personal_data_caveat)]
             redraft = [{**s, "text": lang.fixed(s["text"], question_lang)}
                        if s.get("kind") in ("refusal", "caveat") else s for s in redraft]
             second = verifier.check_answer(redraft).to_dict()
@@ -369,13 +464,230 @@ class Pipeline:
                 draft, check = redraft, second
         kept = sum(s["kept"] for s in check["sentences"])
         self.store.event(qid, "verified", {"status": check["status"], "kept": kept,
-                                           "cut": len(check["sentences"]) - kept})
+                                           "cut": len(check["sentences"]) - kept,
+                                           **({"data_restated": sum(1 for s in draft if s.get("restated"))}
+                                              if added else {}),
+                                           **({"data_citations_attached": attached} if attached else {}),
+                                           **({"repeats_dropped": repeats} if repeats else {}),
+                                           **({"internal_names_dropped": internal} if internal else {}),
+                                           **({"unrelated_passages_dropped": unrelated} if unrelated else {})})
         status = "held" if check["status"] == "held" else "awaiting_review"
         retrieval = [asdict(h) for h in hits]
         data_dicts = [d.to_dict() for d in data]
         self.store.save_record(qid, retrieval, data_dicts, draft, check, status)
         self.store.event(qid, "queued", {"status": status})
         return Record(qid, q, screened.flags, status, retrieval, data_dicts, draft, check)
+
+
+def _kind(source: Any) -> str:
+    if source is None:
+        return ""
+    from dalil.datasource import kind_of
+
+    return kind_of(source)
+
+
+def _numbers(text: str) -> set[str]:
+    from dalil.verify import numbers
+    return numbers(text)
+
+
+def drop_repeats(draft: list[dict[str, Any]], data: list[DataResult] = ()) -> list[dict[str, Any]]:
+    """The draft without claims that repeat an earlier one.
+
+    A small model sometimes writes the same sentence several times, or
+    follows "EHS carried out 1424313 exams in 2025." with "The data value is
+    1424313." A claim is a repeat when its text matches an earlier claim word
+    for word, or when every number in it is an open-data value (not a year
+    alone) that an earlier claim already stated. One copy says it."""
+    values = {n for res in data if res.rows for k, v in res.rows[0].items()
+              if v is not None and k.lower() != "year" for n in _numbers(str(v))}
+    seen: set[str] = set()
+    said: set[str] = set()
+    out = []
+    for s in draft:
+        if s.get("kind", "claim") == "claim":
+            key = " ".join(str(s.get("text", "")).split()).casefold()
+            nums = _numbers(str(s.get("text", "")))
+            if key in seen or (nums & values and nums <= said):
+                continue
+            seen.add(key)
+            said |= nums
+        out.append(s)
+    return out
+
+
+def facts_in_language(draft: list[dict[str, Any]], data: list[DataResult], language: str
+                      ) -> list[dict[str, Any]]:
+    """A rule's English fact sentence in the question's language. The extractive
+    drafter, which answers when the model fails, writes every data fact from
+    the English template; for an Arabic question the Arabic one is used."""
+    if language != lang.ARABIC:
+        return draft
+    swap = {}
+    for res in data:
+        if res.rows and res.fact and res.fact_ar:
+            english = DataResult(res.table, res.sql, res.rows, fact=res.fact)
+            arabic = DataResult(res.table, res.sql, res.rows, fact=res.fact_ar)
+            for en, ar in zip(data_claims([english]), data_claims([arabic])):
+                swap[en["text"]] = ar["text"]
+    return [{**s, "text": swap[s["text"]]} if s.get("kind", "claim") == "claim" and s.get("text") in swap else s
+            for s in draft]
+
+
+def drop_internal_names(draft: list[dict[str, Any]], data: list[DataResult]) -> list[dict[str, Any]]:
+    """The draft without claims that name an open-data table, such as "The data
+    is from the open_ehs_medical_fitness table." A table name is Dalil's own
+    identifier and tells a resident nothing; the screen shows the source."""
+    names = {n.lower() for res in data for n in (res.table, res.table.split(".")[-1])}
+    if not names:
+        return draft
+    return [s for s in draft if s.get("kind", "claim") != "claim"
+            or not any(n in str(s.get("text", "")).lower() for n in names)]
+
+
+def attach_data(draft: list[dict[str, Any]], data: list[DataResult]) -> tuple[list[dict[str, Any]], int]:
+    """Give a drafted claim the data citations for the lookup values it states.
+
+    A small model often writes "The number of exams is 1424313." and cites a
+    passage, or nothing that holds the number. When a claim states a value
+    (other than a year) from the row of a lookup Dalil ran for this question,
+    the citation to that column is added, with the year too if the claim
+    states it. The checker then reruns the query and tests the wording as for
+    any data citation, so this can only keep a sentence the data backs.
+    Returns the new draft and how many citations were added.
+    """
+    added = 0
+    out = []
+    for s in draft:
+        if s.get("kind", "claim") != "claim":
+            out.append(s)
+            continue
+        stated = _numbers(s.get("text", ""))
+        cits = list(s.get("citations") or [])
+        have = {(c.get("sql"), c.get("column")) for c in cits if "sql" in c}
+        new = []
+        for res in data:
+            if not res.rows:
+                continue
+            row = res.rows[0]
+            cols = [k for k, v in row.items() if v not in (None, "") and _numbers(str(v))
+                    and _numbers(str(v)) <= stated]
+            if not any(k.lower() != "year" for k in cols):
+                continue
+            new += [{"table": res.table, "sql": res.sql, "column": k, "value": str(row[k])}
+                    for k in cols if (res.sql, k) not in have]
+        if new:
+            added += len(new)
+            s = {**s, "citations": cits + new, "data_attached": len(new)}
+        out.append(s)
+    return out, added
+
+
+def drop_unrelated_passages(draft: list[dict[str, Any]], data: list[DataResult]
+                            ) -> tuple[list[dict[str, Any]], int]:
+    """On a claim that states a lookup's value and cites that lookup, put the
+    data citations first, and keep a passage citation only if its quote shares
+    a subject word with the claim.
+
+    The model tends to add a passage to every data sentence, such as a page on
+    cancelling a visa next to "ICP handles 3763072 residence permit renewals".
+    The reviewer opens that source first, and it backs nothing in the sentence.
+    The data citation carries the claim; a passage that names the same subject
+    stays. Returns the new draft and how many citations were taken off."""
+    from dalil.retrieve import tokenize
+    sqls = {d.sql for d in data if d.rows}
+    dropped = 0
+    out = []
+    for s in draft:
+        cits = s.get("citations") or []
+        if s.get("kind", "claim") != "claim" or not any(c.get("sql") in sqls and _states(s, c) for c in cits):
+            out.append(s)
+            continue
+        words = {t for t in tokenize(str(s.get("text", ""))) if not t.isdigit()}
+        # The data citations come first: they carry the claim, so the screen
+        # numbers them 1, 2, and a reviewer opens the lookup before any page.
+        keep = [c for c in cits if "sql" in c] + [
+            c for c in cits if "sql" not in c
+            and words & {t for t in tokenize(str(c.get("quote") or "")) if not t.isdigit()}]
+        dropped += len(cits) - len(keep)
+        out.append({**s, "citations": keep} if keep != cits else s)
+    return out, dropped
+
+
+def _states(sentence: Mapping[str, Any], citation: Mapping[str, Any]) -> bool:
+    """True when the sentence's text holds the data citation's value."""
+    value = _numbers(str(citation.get("value") or ""))
+    return bool(value) and value <= _numbers(sentence.get("text", ""))
+
+
+def _drop_unstated_data(sentence: dict[str, Any]) -> dict[str, Any]:
+    cits = sentence.get("citations") or []
+    keep = [c for c in cits if "sql" not in c or _states(sentence, c)]
+    if len(keep) == len(cits) or sentence.get("kind", "claim") != "claim":
+        return sentence
+    return {**sentence, "citations": keep, "unstated_data_dropped": len(cits) - len(keep)}
+
+
+_COUNT_QUESTION = re.compile(r"\bhow\s+many\b|\bnumber\s+of\b|كم\s+عدد|عدد", re.I)
+
+
+def counted_lookups(question: str, english: str, rules: Any) -> set[str]:
+    """The queries of rules a question asks the count of: the rule matches in a
+    sentence of the question that asks how many."""
+    out = set()
+    for text in (question, english):
+        for sentence in re.split(r"[.?!؟\n]+", text or ""):
+            if _COUNT_QUESTION.search(sentence):
+                out |= {r.sql for r in rules or () if r.pattern.search(sentence)}
+    return out
+
+
+def restate_data(draft: list[dict[str, Any]], check: dict[str, Any], data: list[DataResult],
+                 language: str = "en", counted: set[str] | frozenset[str] = frozenset()
+                 ) -> list[dict[str, Any]] | None:
+    """A new draft when the model tried to state an open-data result but no
+    kept sentence states it; else None.
+
+    A sentence carries a lookup only when it cites the query and states the
+    cited value. A data citation on a sentence that does not state its value
+    backs nothing, so it is taken off that sentence; the sentence still has to
+    pass on its other citations.
+
+    "Tried" means a drafted claim cites the lookup's query or writes one of the
+    values in its row other than the year. The rule's own fixed sentence (dalil/opendata.py) then
+    states the value, with a citation the checker reruns like any other. The
+    model's cut sentence stays in the record for the reviewer to see. A lookup
+    the model left alone is left out: it judged the data off the question,
+    unless the question asks how many, which the lookup answers.
+    """
+    sentences = check.get("sentences", [])
+    out = [_drop_unstated_data(s) for s in draft]
+    changed = out != draft
+    extra = []
+    for res in data:
+        if not res.rows or not res.fact:
+            continue
+        carried = any(s["kept"] and any(c.get("ok") and c.get("sql") == res.sql and _states(s, c)
+                                        for c in s.get("citations", []))
+                      for s in sentences)
+        if carried:
+            continue
+        # A year alone does not show intent: passage claims carry years too.
+        values = _numbers(" ".join(str(v) for k, v in res.rows[0].items() if v is not None and k.lower() != "year"))
+        tried = any(s.get("kind", "claim") == "claim" and (
+            any(c.get("sql") == res.sql for c in s.get("citations") or []) or _numbers(s.get("text", "")) & values)
+            for s in draft)
+        if tried or res.sql in counted:
+            # In the question's language: the Arabic sentence when there is one.
+            said = DataResult(res.table, res.sql, res.rows, fact=res.fact_ar if language == lang.ARABIC and res.fact_ar
+                              else res.fact)
+            extra += [{**claim, "restated": True} for claim in data_claims([said])]
+    if not extra:
+        return out if changed else None
+    # After the model's claims, before the fixed caveats and refusals.
+    at = max((i + 1 for i, s in enumerate(out) if s.get("kind", "claim") == "claim"), default=0)
+    return out[:at] + extra + out[at:]
 
 
 def fuse(first: list[Hit], second: list[Hit], rrf_k: int = 60) -> list[Hit]:

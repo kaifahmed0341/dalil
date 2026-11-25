@@ -108,6 +108,15 @@ abbr[title] { text-decoration: none; }
 .dot-on { background: var(--accent); }
 .dot-off { background: transparent; box-shadow: inset 0 0 0 2px var(--faint); }
 .badge { font-size: 0.875rem; font-weight: 600; padding: 2px 8px; border-radius: 999px; }
+.topbar-side { display: grid; gap: 6px; justify-items: end; align-self: center; }
+.kb-picker { display: flex; align-items: center; gap: 8px; font-size: 0.875rem; }
+.kb-picker label { font-weight: 650; color: var(--text); }
+.kb-picker select {
+  max-width: 26em; padding: 4px 8px; font: inherit; color: var(--text);
+  border: 1px solid var(--line-strong); border-radius: var(--radius); background: var(--surface);
+}
+.kb-picker select:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.kb-picker select:disabled { color: var(--muted); background: var(--surface-2); }
 .badge-mock { background: var(--working-bg); color: var(--working-fg); }
 
 /* ---------- buttons ---------- */
@@ -405,7 +414,7 @@ a:hover { color: #063d3e; }
 @media (max-width: 1040px) {
   body { height: auto; }
   .topbar { grid-template-columns: 1fr; }
-  .health { justify-items: start; text-align: start; }
+  .health, .topbar-side { justify-items: start; text-align: start; }
   .health-line { justify-content: flex-start; }
   .layout { grid-template-columns: 1fr; }
   .queue { max-height: 32vh; border-right: none; border-bottom: 1px solid var(--line); }
