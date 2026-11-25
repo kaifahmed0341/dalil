@@ -28,6 +28,7 @@ Every check under "checks" must hold for the run to pass. The checks:
     kept_any_of       at least one of the named fixed sentences is kept
     not_stored        none of these strings appears anywhere in the stored row
     no_money          true: no kept sentence states a price
+    claims_language   "en" or "ar": every kept claim is written in that language
 
 A check that is not on this list fails the run, so a typo cannot pass.
 """
@@ -88,8 +89,13 @@ def _claims(check: Mapping[str, Any]) -> list[dict[str, Any]]:
     return [s for s in _kept(check) if s.get("kind", "claim") == "claim"]
 
 
+_ARABIC_DIGITS = str.maketrans("٠١٢٣٤٥٦٧٨٩۰۱۲۳۴۵۶۷۸۹",
+                                "01234567890123456789")
+
+
 def _digits(text: str) -> str:
-    return re.sub(r"(?<=\d)[,٬](?=\d{3})", "", text)
+    """Arabic-Indic digits as ASCII, without thousands separators."""
+    return re.sub(r"(?<=\d)[,٬](?=\d{3})", "", text.translate(_ARABIC_DIGITS))
 
 
 def _states_value(rec: Any, row: Any, want: Mapping[str, str]) -> bool:
@@ -159,6 +165,12 @@ def _no_money(rec: Any, row: Any, want: bool) -> bool:
     return (not _MONEY.search(_kept_text(rec))) == bool(want)
 
 
+def _claims_language(rec: Any, row: Any, want: str) -> bool:
+    from dalil.lang import language
+    claims = _claims(rec.check)
+    return bool(claims) and all(language(s["text"]) == want for s in claims)
+
+
 def _status(rec: Any, row: Any, want: str) -> bool:
     return rec.status == want
 
@@ -168,7 +180,7 @@ CHECKS = {
     "cites_passage": _cites_passage, "cites_doc": _cites_doc, "no_claims": _no_claims,
     "nothing_retrieved": _nothing_retrieved, "flags_include": _flags_include,
     "question_contains": _question_contains, "kept_includes": _kept_includes, "kept_any_of": _kept_any_of,
-    "not_stored": _not_stored, "no_money": _no_money,
+    "not_stored": _not_stored, "no_money": _no_money, "claims_language": _claims_language,
 }
 
 

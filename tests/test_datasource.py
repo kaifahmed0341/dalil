@@ -347,3 +347,44 @@ def test_a_year_alone_does_not_count_as_stating_the_data(tmp_path, local):
     ])
     rec = p.answer("How many labour complaints does MOHRE solve? I want to renew my card.")
     assert not any(s.get("restated") for s in rec.draft)
+
+
+@pytest.mark.parametrize("question, rule", [
+    ("كم عدد بطاقات الهوية الإماراتية التي يتم تجديدها سنويا؟", "emirates_id_renewals"),
+    ("كم عدد تصاريح الإقامة التي يتم تجديدها كل عام؟", "residence_renewals"),
+    ("كم عدد مراكز تسهيل في الدولة؟", "tasheel_centres"),
+    ("كم عدد فحوصات اللياقة الطبية للإقامة سنويا؟", "medical_fitness"),
+    ("كم عدد الشكاوى العمالية التي تحلها الوزارة؟", "labour_complaints"),
+])
+def test_arabic_questions_reach_the_open_data(question, rule):
+    from dalil.opendata import match_rules
+    assert [r.name for r in match_rules(question)] == [rule]
+
+
+def test_every_arabic_fact_passes_the_checker(local):
+    from dalil.draft import data_claims
+    from dalil.opendata import DataResult, run_rules
+    for rule in RULES:
+        res = run_rules([rule], lambda sql: local.sql(sql, limit=200).dicts(), source="local")[0]
+        assert res.fact_ar and res.fact_ar.count("{") == res.fact.count("{")
+        claims = data_claims([DataResult(res.table, res.sql, res.rows, fact=res.fact_ar)])
+        check = Verifier({}, data_lookup(local), allowed_sql=[rule.sql]).check_answer(claims)
+        assert check.status == "pass", (rule.name, check.to_dict())
+
+
+def test_a_cut_arabic_attempt_is_restated_in_arabic(tmp_path, local):
+    p = scripted(tmp_path, local, [
+        {"text": "تحل الوزارة 207927 شكوى عمالية في عام 2019.", "kind": "claim", "citations": [QUOTE]},
+    ])
+    rec = p.answer("كم عدد الشكاوى العمالية التي تحلها الوزارة؟")
+    kept = [s["text"] for s in rec.check["sentences"] if s["kept"]]
+    assert any("207927" in t and "شكوى" in t for t in kept), rec.check
+
+
+def test_states_value_reads_arabic_indic_digits():
+    from dalil import scenarios as sc
+    from dalil.pipeline import Record
+    cit = {"ok": True, "reason": "value returned by the query", "table": "dalil.t", "column": "n", "value": "49"}
+    rec = Record("x", "q", [], "awaiting_review", check={"sentences": [
+        {"text": "يوجد ٤٩ مركز تسهيل.", "kind": "claim", "kept": True, "citations": [cit]}]})
+    assert sc.CHECKS["states_value"](rec, {}, {"table": "dalil.t", "column": "n", "value": "49"})

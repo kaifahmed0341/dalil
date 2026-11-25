@@ -282,9 +282,9 @@ class Pipeline:
                             allowed_sql=[d.sql for d in data], allowed_uncited=FIXED_UNCITED,
                             allowed_passages=[h.passage_id for h in hits], titles=self.titles, laws=self.laws,
                             similarity=getattr(self.retriever, "similarities", None),
-                            data_facts={d.sql: d.fact for d in data if d.fact})
+                            data_facts={d.sql: " ".join(f for f in (d.fact, d.fact_ar) if f) for d in data if d.fact})
         check = verifier.check_answer(draft).to_dict()
-        added = restate_data(draft, check, data)
+        added = restate_data(draft, check, data, question_lang)
         if added:
             draft = added
             check = verifier.check_answer(draft).to_dict()
@@ -314,8 +314,8 @@ def _numbers(text: str) -> set[str]:
     return numbers(text)
 
 
-def restate_data(draft: list[dict[str, Any]], check: dict[str, Any], data: list[DataResult]
-                 ) -> list[dict[str, Any]] | None:
+def restate_data(draft: list[dict[str, Any]], check: dict[str, Any], data: list[DataResult],
+                 language: str = "en") -> list[dict[str, Any]] | None:
     """A new draft when the model tried to state an open-data result but the
     checker cut every sentence that carried it; else None.
 
@@ -341,7 +341,10 @@ def restate_data(draft: list[dict[str, Any]], check: dict[str, Any], data: list[
             any(c.get("sql") == res.sql for c in s.get("citations") or []) or _numbers(s.get("text", "")) & values)
             for s in draft)
         if tried:
-            extra += [{**claim, "restated": True} for claim in data_claims([res])]
+            # In the question's language: the Arabic sentence when there is one.
+            said = DataResult(res.table, res.sql, res.rows, fact=res.fact_ar if language == lang.ARABIC and res.fact_ar
+                              else res.fact)
+            extra += [{**claim, "restated": True} for claim in data_claims([said])]
     if not extra:
         return None
     # After the model's claims, before the fixed caveats and refusals.

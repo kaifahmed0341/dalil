@@ -27,6 +27,8 @@ class DataRule:
     sql: str
     # A sentence with {column} slots; each slot becomes a data citation.
     fact: str
+    # The same sentence in Arabic, for a question asked in Arabic.
+    fact_ar: str = ""
 
 
 @dataclass
@@ -38,51 +40,60 @@ class DataResult:
     fact: str | None = None
     # "local" or "zetaris": the source that ran the query. Empty when none did.
     source: str = ""
+    fact_ar: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {"table": self.table, "sql": self.sql, "rows": self.rows, "note": self.note, "fact": self.fact,
-                "source": self.source}
+                "source": self.source, "fact_ar": self.fact_ar}
 
     @classmethod
     def from_dict(cls, d: Mapping[str, Any]) -> "DataResult":
         return cls(d["table"], d["sql"], list(d.get("rows") or []), d.get("note") or "", d.get("fact"),
-                   d.get("source") or "")
+                   d.get("source") or "", d.get("fact_ar"))
 
 
 RULES: tuple[DataRule, ...] = (
     DataRule(
-        "emirates_id_renewals", re.compile(r"\bemirates\s+id\b|\bid\s+card\b", re.I),
+        "emirates_id_renewals",
+        re.compile(r"\bemirates\s+id\b|\bid\s+card\b|الهوية\s+ال[إا]ماراتية|بطاقة\s+الهوية", re.I),
         "dalil.open_icp_transactions",
         "SELECT year, transactions FROM dalil.open_icp_transactions "
         "WHERE service_en = 'Renewal of ID Card' ORDER BY year DESC LIMIT 1",
         "ICP open data counts {transactions} Emirates ID card renewals in {year}.",
+        "تسجل البيانات المفتوحة للهيئة الاتحادية للهوية والجنسية {transactions} عملية تجديد لبطاقة الهوية "
+        "الإماراتية في عام {year}.",
     ),
     DataRule(
-        "residence_renewals", re.compile(r"\brenew(?:al|als|ing|ed)?\b", re.I),
+        "residence_renewals", re.compile(r"\brenew(?:al|als|ing|ed)?\b|تجديد|يجدد|تجدد", re.I),
         "dalil.open_icp_transactions",
         "SELECT year, transactions FROM dalil.open_icp_transactions "
         "WHERE service_en = 'Renewal of Residence Permits' ORDER BY year DESC LIMIT 1",
         "ICP open data counts {transactions} residence permit renewals in {year}.",
+        "تسجل البيانات المفتوحة للهيئة الاتحادية للهوية والجنسية {transactions} عملية تجديد لتصاريح الإقامة "
+        "في عام {year}.",
     ),
     DataRule(
-        "tasheel_centres", re.compile(r"\btasheel\b", re.I),
+        "tasheel_centres", re.compile(r"\btasheel\b|تسهيل", re.I),
         "dalil.open_tasheel_centres",
         "SELECT COUNT(*) AS centres, COUNT(DISTINCT emirate_en) AS emirates FROM dalil.open_tasheel_centres",
         "MOHRE open data lists {centres} Tasheel service centres across {emirates} emirates.",
+        "تُدرج البيانات المفتوحة لوزارة الموارد البشرية والتوطين {centres} مركز خدمة تسهيل في {emirates} إمارات.",
     ),
     DataRule(
-        "medical_fitness", re.compile(r"\bmedical\s+(?:fitness|test|exam)", re.I),
+        "medical_fitness",
+        re.compile(r"\bmedical\s+(?:fitness|test|exam)|الفحص\s+الطبي|فحص\s+طبي|فحوصات\s+طبية|اللياقة\s+الطبية", re.I),
         "dalil.open_ehs_medical_fitness",
         "SELECT year, CAST(SUM(CAST(total AS BIGINT)) AS BIGINT) AS exams "
         "FROM dalil.open_ehs_medical_fitness GROUP BY year ORDER BY year DESC LIMIT 1",
         "Emirates Health Services open data counts {exams} residency medical fitness exams in {year}.",
+        "تسجل البيانات المفتوحة لمؤسسة الإمارات للخدمات الصحية {exams} فحص لياقة طبية للإقامة في عام {year}.",
     ),
     DataRule(
         # The file repeats Abu Dhabi's figures under Al-Ain, Delma and Madina
         # Zayed, Sharjah's under Kalbaa and Khorfkan, and one free-zone figure
         # under five names, and 2020 looks partial (data/open/README.md). So
         # the sum counts each emirate's own row once and stops at 2019.
-        "labour_complaints", re.compile(r"\bcomplain(?:t|ts|ing)?\b", re.I),
+        "labour_complaints", re.compile(r"\bcomplain(?:t|ts|ing)?\b|شكوى|شكاوى|شكاوي", re.I),
         "dalil.open_mohre_solved_complaints",
         "SELECT Year AS year, CAST(SUM(CAST(SolvedComplaints_count AS BIGINT)) AS BIGINT) AS solved "
         "FROM dalil.open_mohre_solved_complaints "
@@ -90,6 +101,8 @@ RULES: tuple[DataRule, ...] = (
         "AND Year <= 2019 GROUP BY Year ORDER BY Year DESC LIMIT 1",
         "MOHRE open data records {solved} solved private-sector labour complaints in {year}, "
         "counting each emirate once.",
+        "تسجل البيانات المفتوحة لوزارة الموارد البشرية والتوطين {solved} شكوى عمالية محلولة في القطاع الخاص "
+        "في عام {year}، مع احتساب كل إمارة مرة واحدة.",
     ),
 )
 
@@ -117,7 +130,8 @@ def run_rules(rules: Iterable[DataRule], run: SqlRunner | None, unavailable: str
     `source` names the backend that ran the queries ("local" or "zetaris")."""
     out = []
     for rule in rules:
-        res = DataResult(rule.table, rule.sql, fact=rule.fact, source=source if run is not None else "")
+        res = DataResult(rule.table, rule.sql, fact=rule.fact, source=source if run is not None else "",
+                         fact_ar=rule.fact_ar or None)
         if run is None:
             res.note = unavailable or "Open data not configured; lookup skipped"
         else:
