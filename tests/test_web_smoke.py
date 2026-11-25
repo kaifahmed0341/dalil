@@ -10,7 +10,8 @@ left. No server, model or corpus is needed.
 It needs Playwright for Python and a Chromium it can launch, so it is skipped
 when they are missing. To run it:
 
-    uv run --with playwright pytest tests/test_web_smoke.py
+    uv run --extra web-test playwright install --only-shell chromium   # once
+    uv run --extra web-test pytest tests/test_web_smoke.py
 """
 
 from __future__ import annotations
