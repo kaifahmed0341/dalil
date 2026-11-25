@@ -335,7 +335,7 @@ def test_data_the_model_left_alone_is_not_added(tmp_path, local):
         {"text": "Renewal requests are made through the service centres or the official website of the authority.",
          "kind": "claim", "citations": [QUOTE]},
     ])
-    rec = p.answer("How many labour complaints does MOHRE solve? I want to renew my card.")
+    rec = p.answer("Where do labour complaints to MOHRE go? I want to renew my card.")
     assert rec.data and rec.data[0]["rows"]
     assert not any(any(c.get("sql") for c in s["citations"]) for s in rec.check["sentences"])
 
@@ -345,7 +345,7 @@ def test_a_year_alone_does_not_count_as_stating_the_data(tmp_path, local):
         {"text": "Renewal requests are made through the service centres or the official website of the authority "
                  "in 2019.", "kind": "claim", "citations": [QUOTE]},
     ])
-    rec = p.answer("How many labour complaints does MOHRE solve? I want to renew my card.")
+    rec = p.answer("Where do labour complaints to MOHRE go? I want to renew my card.")
     assert not any(s.get("restated") for s in rec.draft)
 
 
@@ -545,3 +545,29 @@ def test_a_data_claim_lists_its_data_citation_first(tmp_path, local):
     rec = p.answer("How many Tasheel service centres are there?")
     first = next(s for s in rec.check["sentences"] if s["kept"])
     assert "sql" in first["citations"][0] and first["citations"][1].get("passage_id") == QUOTE["passage_id"]
+
+
+def test_a_count_question_gets_the_number_even_if_the_model_leaves_it_out(tmp_path, local):
+    p = scripted(tmp_path, local, [
+        {"text": "Renewal requests are made through the service centres or the official website of the authority.",
+         "kind": "claim", "citations": [QUOTE]}])
+    rec = p.answer("How many Emirates ID cards does ICP renew in a year?")
+    kept = [s["text"] for s in rec.check["sentences"] if s["kept"]]
+    assert "ICP open data counts 5856085 Emirates ID card renewals in 2025." in kept
+
+
+def test_a_question_that_does_not_ask_a_count_is_left_alone(tmp_path, local):
+    p = scripted(tmp_path, local, [
+        {"text": "Renewal requests are made through the service centres or the official website of the authority.",
+         "kind": "claim", "citations": [QUOTE]}])
+    rec = p.answer("Where do I renew my Emirates ID card?")
+    assert not any(any(c.get("sql") for c in s["citations"]) for s in rec.check["sentences"])
+
+
+def test_only_the_lookup_the_count_question_asks_about_is_stated():
+    from dalil.pipeline import counted_lookups
+    complaints = next(r for r in RULES if r.name == "labour_complaints")
+    renewals = next(r for r in RULES if r.name == "residence_renewals")
+    q = "How many labour complaints does MOHRE solve? I want to renew my card."
+    assert counted_lookups(q, "", RULES) == {complaints.sql}
+    assert renewals.sql in counted_lookups("كم عدد تصاريح الإقامة التي يتم تجديدها؟", "", RULES)
