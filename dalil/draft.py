@@ -376,6 +376,8 @@ class LLMDrafter:
         "Keep every condition and exception from the source, such as who it applies to or when. "
         "Never state a rule more broadly than the source does.",
         "Prefer sentences about exactly what was asked; leave out side details.",
+        "State a data value once, in a sentence about what it counts. Never write about tables, rows, queries "
+        "or where the data comes from; Dalil shows the source itself.",
         "When a claim says what a law says, name that law in the claim by its number and year, as its passage "
         "header gives it. Never present a sentence from one law as if it were about another law.",
         "Reviewers rejected earlier answers to similar questions with the notes given. Do not repeat those mistakes.",

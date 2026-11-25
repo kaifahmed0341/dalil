@@ -310,6 +310,7 @@ class Pipeline:
             "sentences": len(draft),
             "kinds": [s.get("kind", "claim") for s in draft],
         })
+        draft = drop_repeats(draft)
         draft, attached = attach_data(draft, data)
         if client is None and any("sql" in c for s in draft for c in s.get("citations") or []):
             client, _ = self.data_source()
@@ -348,6 +349,21 @@ def _kind(source: Any) -> str:
 def _numbers(text: str) -> set[str]:
     from dalil.verify import numbers
     return numbers(text)
+
+
+def drop_repeats(draft: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """The draft without a claim whose text repeats an earlier claim word for word.
+    A small model sometimes writes the same sentence several times; one copy says it."""
+    seen: set[str] = set()
+    out = []
+    for s in draft:
+        if s.get("kind", "claim") == "claim":
+            key = " ".join(str(s.get("text", "")).split()).casefold()
+            if key in seen:
+                continue
+            seen.add(key)
+        out.append(s)
+    return out
 
 
 def attach_data(draft: list[dict[str, Any]], data: list[DataResult]) -> tuple[list[dict[str, Any]], int]:
