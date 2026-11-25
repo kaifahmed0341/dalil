@@ -423,9 +423,11 @@ def test_a_wrong_number_gets_no_data_citation(tmp_path, local):
         {"text": "Emirates Health Services carried out 1424314 medical fitness exams.", "kind": "claim",
          "citations": [QUOTE]},
     ])
+    p.redraft = False  # look at the model's own sentence, not the fallback that replaces an all-cut answer
     rec = p.answer("How many medical fitness exams for residency visas does Emirates Health Services carry out?")
-    assert not rec.check["sentences"][0]["kept"]
-    assert not any(c.get("sql") for c in rec.check["sentences"][0]["citations"])
+    wrong = next(x for x in rec.check["sentences"] if "1424314" in x["text"])
+    assert not wrong["kept"]
+    assert not any(c.get("sql") for c in wrong["citations"])
 
 
 def test_a_year_alone_attaches_nothing(tmp_path, local):
