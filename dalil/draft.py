@@ -458,8 +458,9 @@ class LLMDrafter:
         "Prefer sentences about exactly what was asked; leave out side details.",
         "State a data value once, in a sentence about what it counts. Never write about tables, rows, queries "
         "or where the data comes from; Dalil shows the source itself.",
-        "When a claim says what a law says, name that law in the claim by its number and year, as its passage "
-        "header gives it. Never present a sentence from one law as if it were about another law.",
+        "When a claim says what a law says, name that law briefly inside the claim by its number and year, as in "
+        "\"Under Law No. 26 of 2007, ...\". Never copy a law's full title or a page header such as \"Page 3 of "
+        "10\" into a claim. Never present a sentence from one law as if it were about another law.",
         "Each claim rests on one source document. Never join sentences about different services, people or "
         "laws into one claim.",
         "Reviewers rejected earlier answers to similar questions with the notes given. Do not repeat those mistakes.",

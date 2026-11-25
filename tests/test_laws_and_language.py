@@ -950,3 +950,11 @@ def test_a_timeout_is_recorded_with_its_limit():
     d = FallbackDrafter(Slow(), ExtractiveDrafter())
     d.draft("Can I see my records?", [as_hit(PORTAL, 20.0)], [])
     assert d.last_error == "TimeoutError: the model did not answer within 180 s"
+
+
+def test_a_leading_law_name_sentence_is_set_aside_for_the_meaning_test():
+    from dalil.verify import _ATTRIBUTION
+    t = "قانون رقم (26) من عام 2007 ينظم العلاقة بين المالك والمستأجر في دبي. يجب تحديد الإيجار في عقد الإيجار."
+    assert _ATTRIBUTION.sub("", t) == "يجب تحديد الإيجار في عقد الإيجار."
+    assert _ATTRIBUTION.sub("", "Law No. 26 of 2007 regulates rent. The Rent must be specified.") == "The Rent must be specified."
+    assert _ATTRIBUTION.sub("", "The Rent must be specified in the contract.") == "The Rent must be specified in the contract."

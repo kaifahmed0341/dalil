@@ -39,5 +39,5 @@
 {"id": "c39", "question": "ما هي أهداف سياسة المنصة الرقمية الموحدة؟", "expected_docs": ["uae-unified-digital-platform-policy-ar", "uae-digital-government-strategy-2025"]}
 {"id": "c40", "question": "هل يطبق قانون حماية البيانات الشخصية على الجهات الحكومية؟", "expected_docs": ["uae-pdpl-fdl-45-2021-ar", "uaelegislation-federal-decree-law-45-2021-personal-data-protection-en", "uae-data-protection-laws"]}
 {"id": "c41", "question": "Can a Golden Visa holder sponsor their parents, and what do they need?", "expected_docs": ["uae-golden-visa"], "must_pass": true, "must_not_say": ["parents"]}
-{"id": "c42", "question": "Can a Green visa holder sponsor their parents?", "expected_docs": ["uae-green-visa", "uae-work-residence-visa"], "must_not_say": ["parents"]}
+{"id": "c42", "question": "Can a Green visa holder sponsor their parents?", "expected_docs": ["uae-green-visa", "uae-work-residence-visa", "uae-family-residence-visa"], "must_not_say": ["parents"]}
 {"id": "c43", "question": "Can a Golden visa holder sponsor their brothers and sisters?", "expected_docs": ["uae-golden-visa"], "must_not_say": ["brothers", "sisters"]}

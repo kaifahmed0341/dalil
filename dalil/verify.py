@@ -235,7 +235,10 @@ _AR_IDIOMS = re.compile(
 # A leading "According to Article 43 of the Labour Law," or "وفقاً للمادة 43
 # من قانون العمل،": who says it, not what is said.
 _ATTRIBUTION = re.compile(
-    r"^\s*(?:(?:according\s+to|under|as\s+per|per)\b[^,]{0,120},|(?:وفق[اًا]*|طبق[اًا]*|بموجب|حسب)\s[^،,]{0,120}[،,])\s*",
+    r"^\s*(?:(?:according\s+to|under|as\s+per|per)\b[^,]{0,120},|(?:وفق[اًا]*|طبق[اًا]*|بموجب|حسب)\s[^،,]{0,120}[،,]"
+    # or a whole leading sentence that only names a law: "قانون رقم (26) من
+    # عام 2007 ينظم العلاقة بين المالك والمستأجر في دبي." / "Law No. 26 of 2007 ..."
+    r"|(?:ال)?(?:قانون|مرسوم)[^.]{0,40}?رقم[^.]{0,160}?\.|law\s+no\.?[^.]{0,160}?\.(?=\s))\s*",
     re.IGNORECASE)
 _LATIN_WORD = re.compile(r"[A-Za-z][A-Za-z'-]+")
 # Scripts no answer here is written in: Cyrillic, Greek, CJK, Hangul.
