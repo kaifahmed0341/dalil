@@ -351,10 +351,26 @@ class Pipeline:
         # What the question asks about the subject: its words, less the
         # subject's own name and words for the person holding it.
         asked = set(tokenize(question)) - set().union(*(title_terms(n) for n in names)) - _ROLE_WORDS \
-            - safety.subject_generic()
+            - safety.subject_generic() - self._common_words()
+        # Two of the asked words, or all of them when fewer: one shared word,
+        # such as "medical" in "medical fitness tests for dependants", does
+        # not make another page's passage answer "which medical conditions
+        # make someone unfit".
+        need = min(2, len(asked))
         return [h for h in hits if h.doc_id in subjects or h.doc_id in laws
                 or (names_subject(f"{titles.get(h.doc_id, '')} {h.heading or ''} {h.text}", names)
-                    and set(tokenize(h.text)) & asked)]
+                    and len(set(tokenize(h.text)) & asked) >= need)]
+
+    def _common_words(self) -> set[str]:
+        """Words in more than a fifth of the passages, such as "uae": they say
+        nothing about what a passage is about."""
+        lexical = getattr(self.retriever, "lexical", None)
+        postings, n = getattr(lexical, "_postings", None), len(getattr(lexical, "passages", []) or [])
+        if not postings or not n:
+            return set()
+        if getattr(self, "_common_cache", None) is None:
+            self._common_cache = {t for t, post in postings.items() if len(post) > n / 5}
+        return self._common_cache
 
     def _language(self, doc_id: str) -> str:
         for p in self.passages.values():

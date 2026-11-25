@@ -227,6 +227,8 @@ _DUN_AMOUNT = re.compile(r"دون\s+(?:سن|عمر|[\d\u0660-\u0669])")
 # "at least" or "at most": "لا يقل عن", "not less than", "no more than".
 _AR_IDIOMS = re.compile(
     r"ما\s+لم|لا\s*سي[ّ]?ما|لا\s+بد|لابد|[لم]ا\s+[يت]زال|[لأ]ل?ا\s+[يت](?:قل|زيد|تجاوز)\w*|[لأ]ل?ا\s+تتجاوز"
+    # "لا يمكن أن تكون أقل من" and "لا يجوز أن تزيد على": a bound said longer.
+    r"|[لأ]ل?ا\s+(?:يمكن|يجوز)\s+(?:[أا]ن\s+)?(?:[يت]كون\s+)?(?:[أا]قل|[أا]كثر|[يت]قل|[يت]زيد|[يت]تجاوز)\w*"
     r"|\b(?:not|no)\s+(?:be\s+)?(?:less|more|fewer|later|earlier|longer|shorter)\s+than\b"
     r"|\bnot\s+(?:be\s+)?(?:exceed|exceeding)\b",
     re.IGNORECASE)
@@ -636,10 +638,12 @@ class Verifier:
         against a whole legal paragraph."""
         text, en = result.text, result.text_en
         backed = set().union(*(numbers(c.evidence) for c in result.citations))
-        # Latin words in the Arabic, such as "ICP", must come from the English
-        # version or the sources; a stray "acordo" is a slip of the model.
-        known = {w.casefold() for w in _LATIN_WORD.findall(f"{en} {evidence}")}
-        stray = sorted({w for w in _LATIN_WORD.findall(text) if w.casefold() not in known})
+        # Latin words in the Arabic may only be names and acronyms from the
+        # sources or the English version, such as "ICP" or "MoHRE". A stray
+        # "acordo", or English such as "provided" left in an Arabic sentence,
+        # is a slip of the model.
+        known = {w for w in _LATIN_WORD.findall(f"{en} {evidence}") if w[0].isupper()}
+        stray = sorted({w for w in _LATIN_WORD.findall(text) if w not in known})
         titled = set().union(*(numbers(c.title) for c in result.citations)) & law_numbers(en)
         missing = sorted(numbers(en) - backed - titled, key=lambda n: (len(n), n))
         problems = []

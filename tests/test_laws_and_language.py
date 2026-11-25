@@ -870,3 +870,20 @@ def test_still_is_not_a_negation():
     from dalil.verify import _negations, _words, _without_idioms
     assert not _negations(_words(_without_idioms("تأشيرتي لا تزال سارية.")))
     assert _negations(_words(_without_idioms("تأشيرتي لا تعتبر سارية.")))
+
+
+def test_longer_arabic_bounds_and_english_words_inside_arabic():
+    from dalil.verify import _negations, _words, _without_idioms
+    assert not _negations(_words(_without_idioms("فترة الإشعار لا يمكن أن تكون أقل من 30 يوماً")))
+    assert not _negations(_words(_without_idioms("لا يجوز أن تزيد مدة الإشعار على 90 يوماً")))
+    p = passage("sample-absence:p1:1", "The worker may specify the day of absence provided that he notifies the "
+                "employer 3 days before. Requests go to MoHRE.", kind="html")
+    v = Verifier({p["passage_id"]: p}, similarity=lambda c, w: [0.9 for _ in w])
+    en = "The worker may specify the day of absence provided that he notifies the employer 3 days before."
+    quote = {"passage_id": p["passage_id"], "quote": p["text"]}
+    slip = v.check_sentence({"text": "يمكن للعامل تحديد يوم الغياب، provided أن يبلغ صاحب العمل قبل 3 أيام.",
+                             "text_en": en, "citations": [quote]})
+    assert not slip.kept and "provided" in slip.reasons[0]
+    name = v.check_sentence({"text": "يمكن للعامل تحديد يوم الغياب بشرط أن يبلغ صاحب العمل قبل 3 أيام، وتقدم الطلبات إلى MoHRE.",
+                             "text_en": en + " Requests go to MoHRE.", "citations": [quote]})
+    assert name.kept, name.reasons
