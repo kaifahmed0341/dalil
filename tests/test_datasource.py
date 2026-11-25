@@ -318,12 +318,12 @@ def test_a_cut_attempt_at_the_data_is_restated_with_the_rule_sentence(tmp_path, 
     p = scripted(tmp_path, local, [
         {"text": "Renewal requests are made through the service centres or the official website of the authority.",
          "kind": "claim", "citations": [QUOTE]},
-        {"text": "MOHRE solves 207927 private-sector labour complaints in 2019.", "kind": "claim",
+        {"text": "Ask anyone and they will tell you 207927 is a big figure.", "kind": "claim",
          "citations": [QUOTE]},
     ])
     rec = p.answer("How many labour complaints does MOHRE solve? I want to renew my card.")
     texts = {s["text"]: s["kept"] for s in rec.check["sentences"]}
-    assert texts["MOHRE solves 207927 private-sector labour complaints in 2019."] is False
+    assert texts["Ask anyone and they will tell you 207927 is a big figure."] is False
     fact = "MOHRE open data records 207927 solved private-sector labour complaints in 2019, counting each emirate once."
     assert texts[fact] is True
     verified = next(e for e in p.store.get(rec.id)["audit"] if e["kind"] == "verified")
@@ -402,3 +402,36 @@ def test_a_data_citation_on_a_sentence_that_does_not_state_it_is_dropped_and_the
     assert first["kept"] and not any(c.get("sql") for c in first["citations"])
     kept = [s["text"] for s in rec.check["sentences"] if s["kept"]]
     assert "ICP open data counts 5856085 Emirates ID card renewals in 2025." in kept
+
+
+def test_a_claim_stating_a_lookup_value_gets_its_data_citation(tmp_path, local):
+    p = scripted(tmp_path, local, [
+        {"text": "In 2025, Emirates Health Services carried out 1424313 medical fitness exams for residency visas.",
+         "kind": "claim", "citations": [QUOTE]},
+        {"text": "The data is from the open_ehs_medical_fitness table.", "kind": "claim", "citations": [QUOTE]},
+    ])
+    rec = p.answer("How many medical fitness exams for residency visas does Emirates Health Services carry out?")
+    first = rec.check["sentences"][0]
+    assert first["kept"], first
+    assert {c.get("column") for c in first["citations"] if c.get("sql")} == {"exams", "year"}
+    assert not any(s.get("restated") for s in rec.draft)
+    assert rec.status == "awaiting_review"
+
+
+def test_a_wrong_number_gets_no_data_citation(tmp_path, local):
+    p = scripted(tmp_path, local, [
+        {"text": "Emirates Health Services carried out 1424314 medical fitness exams.", "kind": "claim",
+         "citations": [QUOTE]},
+    ])
+    rec = p.answer("How many medical fitness exams for residency visas does Emirates Health Services carry out?")
+    assert not rec.check["sentences"][0]["kept"]
+    assert not any(c.get("sql") for c in rec.check["sentences"][0]["citations"])
+
+
+def test_a_year_alone_attaches_nothing(tmp_path, local):
+    p = scripted(tmp_path, local, [
+        {"text": "Renewal requests are made through the service centres or the official website of the authority "
+                 "in 2025.", "kind": "claim", "citations": [QUOTE]},
+    ])
+    rec = p.answer("How many Emirates ID cards does ICP renew in a year?")
+    assert not any(c.get("sql") for c in rec.draft[0]["citations"])

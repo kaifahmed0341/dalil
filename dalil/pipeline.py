@@ -276,6 +276,7 @@ class Pipeline:
             "sentences": len(draft),
             "kinds": [s.get("kind", "claim") for s in draft],
         })
+        draft, attached = attach_data(draft, data)
         if client is None and any("sql" in c for s in draft for c in s.get("citations") or []):
             client, _ = self.data_source()
         verifier = Verifier(self.passages, data_lookup(client) if client else None,
@@ -292,7 +293,8 @@ class Pipeline:
         self.store.event(qid, "verified", {"status": check["status"], "kept": kept,
                                            "cut": len(check["sentences"]) - kept,
                                            **({"data_restated": sum(1 for s in draft if s.get("restated"))}
-                                              if added else {})})
+                                              if added else {}),
+                                           **({"data_citations_attached": attached} if attached else {})})
         status = "held" if check["status"] == "held" else "awaiting_review"
         retrieval = [asdict(h) for h in hits]
         data_dicts = [d.to_dict() for d in data]
@@ -312,6 +314,44 @@ def _kind(source: Any) -> str:
 def _numbers(text: str) -> set[str]:
     from dalil.verify import numbers
     return numbers(text)
+
+
+def attach_data(draft: list[dict[str, Any]], data: list[DataResult]) -> tuple[list[dict[str, Any]], int]:
+    """Give a drafted claim the data citations for the lookup values it states.
+
+    A small model often writes "The number of exams is 1424313." and cites a
+    passage, or nothing that holds the number. When a claim states a value
+    (other than a year) from the row of a lookup Dalil ran for this question,
+    the citation to that column is added, with the year too if the claim
+    states it. The checker then reruns the query and tests the wording as for
+    any data citation, so this can only keep a sentence the data backs.
+    Returns the new draft and how many citations were added.
+    """
+    added = 0
+    out = []
+    for s in draft:
+        if s.get("kind", "claim") != "claim":
+            out.append(s)
+            continue
+        stated = _numbers(s.get("text", ""))
+        cits = list(s.get("citations") or [])
+        have = {(c.get("sql"), c.get("column")) for c in cits if "sql" in c}
+        new = []
+        for res in data:
+            if not res.rows:
+                continue
+            row = res.rows[0]
+            cols = [k for k, v in row.items() if v not in (None, "") and _numbers(str(v))
+                    and _numbers(str(v)) <= stated]
+            if not any(k.lower() != "year" for k in cols):
+                continue
+            new += [{"table": res.table, "sql": res.sql, "column": k, "value": str(row[k])}
+                    for k in cols if (res.sql, k) not in have]
+        if new:
+            added += len(new)
+            s = {**s, "citations": cits + new, "data_attached": len(new)}
+        out.append(s)
+    return out, added
 
 
 def _states(sentence: Mapping[str, Any], citation: Mapping[str, Any]) -> bool:
