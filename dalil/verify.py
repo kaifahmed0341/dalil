@@ -115,7 +115,9 @@ for _form in "اسبوعين ساعتين دقيقتين ليلتين".split():
 # Any other word built on these is a number the table does not know, such as
 # "آلاف" (thousands) after a count. It is kept as itself, so the check fails
 # closed: the claim is cut unless its source uses the same word.
-_AR_LARGE = re.compile("مائه|مئه|الاف|الف|مليون|ملايين|مليار")
+# Whole words only, after a prefix and the article are taken off: "مخالفه"
+# and "فتره" contain "الف" and are not numbers.
+_AR_LARGE = re.compile(r"^(?:\S*مائه|\S*مئه|الاف|الوف|مليون|ملايين|مليار|مليارات)$")
 
 
 def _arabic_number_words(text: str) -> set[str]:
@@ -124,10 +126,12 @@ def _arabic_number_words(text: str) -> set[str]:
     for token in tokenize(text, stem=False):  # whole words: the stemmer would cut "آلاف" to "اف"
         bare = token[1:] if len(token) > 3 and token[0] in "وبلف" else token
         forms = [token, bare, *(w[2:] for w in (token, bare) if w.startswith("ال") and len(w) > 4)]
+        if token.startswith("لل") and len(token) > 4:  # "للثلاثين": لِ + ال
+            forms.append(token[2:])
         known = next((w for w in forms if w in _AR_NUMBER_WORDS), None)
         if known:
             out.add(str(_AR_NUMBER_WORDS[known]))
-        elif _AR_LARGE.search(token):
+        elif any(_AR_LARGE.match(w) for w in forms):
             out.add(token)
     return out
 
@@ -205,7 +209,10 @@ def clauses(text: str, size: int = 30) -> list[str]:
 # Arabic words that negate only sometimes: "غير الحكومية" is "non-governmental"
 # and "دون سن" is "under the age of".
 _AR_SOFT_NEGATIONS = frozenset({"غير", "دون"})
-_SOFT_BACKING = frozenset({"non", "under", "below", "except", "less", "without", "other"})
+# "غير" backed by English "non"; "دون" before an age or a number ("دون سن
+# 18") backed by "under", "below" or "less". Nothing else backs them.
+_SOFT_BACKING = {"غير": frozenset({"non"}), "دون": frozenset({"under", "below", "less"})}
+_DUN_AMOUNT = re.compile(r"دون\s+(?:سن|عمر|[\d\u0660-\u0669])")
 
 
 def _negations(words: set[str]) -> set[str]:
@@ -485,9 +492,11 @@ class Verifier:
             # "No." in "Law No. 45" is a law reference, not a negation.
             added = sorted(_negations(_words(_LAW_NUMBER.sub(" ", text))))
             backing = _negations(_words(evidence))
-            if set(added) <= _AR_SOFT_NEGATIONS:
-                # "غير" is often "non-" and "دون" "under"; English that says so backs them.
-                backing |= _words(evidence) & _SOFT_BACKING
+            if not backing and added and set(added) <= _AR_SOFT_NEGATIONS:
+                # "غير" can be "non-" and "دون" "under"; English that says so backs them.
+                words = _words(evidence)
+                if all(words & _SOFT_BACKING[w] and (w != "دون" or _DUN_AMOUNT.search(text)) for w in added):
+                    backing = set(added)
             if result.kept and added and not backing:
                 result.kept = False
                 result.reasons.append("claim adds a negation its sources do not have: " + ", ".join(added))

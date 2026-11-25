@@ -578,3 +578,37 @@ def test_a_failed_translation_is_retried_by_a_later_request(tmp_path):
     to_english = p._to_english("سؤال", "")
     assert to_english("سؤال") == ""  # failed in this request
     assert p._to_english("سؤال", "")("سؤال") == "Does the records law cover public bodies?"  # next request
+
+
+# --- review round 3 ------------------------------------------------------------------
+
+
+def test_ordinary_words_are_not_read_as_numbers():
+    from dalil.verify import numbers
+    assert numbers("تبدأ الفترة من تاريخ المخالفة") == set()
+    assert numbers("الإفصاح عن البيانات") == set()
+    assert numbers("للثلاثين يوماً") == {"30"}
+    assert len(numbers("ثلاثة آلاف درهم")) == 2
+
+
+def test_soft_negations_are_backed_only_by_what_they_mean():
+    p = passage("sample-leave:p1:1", "The worker may leave work after giving notice under Article 43 to the other party.",
+                kind="html")
+    v = Verifier({p["passage_id"]: p}, similarity=lambda c, w: [0.9 for _ in w])
+    claim = {"text": "يحق للعامل ترك العمل دون إشعار.", "citations": [{"passage_id": p["passage_id"], "quote": p["text"]}]}
+    assert not v.check_sentence(claim).kept  # "without notice" is not backed by "under Article 43"
+    q = passage("sample-age:p1:1", "Workers under 18 years of age may not work at night.", kind="html")
+    v2 = Verifier({q["passage_id"]: q}, similarity=lambda c, w: [0.9 for _ in w])
+    young = {"text": "لا يجوز للعمال دون سن 18 العمل ليلاً.",
+             "citations": [{"passage_id": q["passage_id"], "quote": q["text"]}]}
+    assert v2.check_sentence(young).kept
+
+
+@pytest.mark.parametrize("q, refused", [
+    ("أريد أن أزور السفارة لتجديد جواز سفري", False),
+    ("بعد انتهاء تأشيرتي، كيف يمكنني البقاء بدون غرامة؟", True),
+    ("هل يمكن تجديد تصريح العمل بعد انتهاء صلاحيته دون غرامة خلال فترة السماح؟", False),
+    ("كيف أزور شهادة راتب؟", True),
+])
+def test_arabic_screen_round_three(q, refused):
+    assert safety.screen(q).is_rule_evasion is refused
