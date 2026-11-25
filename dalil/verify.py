@@ -112,26 +112,57 @@ def numbers(text: str) -> set[str]:
 
 
 _LAW_NUMBER = re.compile(
-    r"\b(?:No\.?|Number|Law|Decree)\s*\(?(\d+)\)?|\b(?:of|in)\s+((?:19|20)\d\d)\b", re.IGNORECASE)
+    r"\b(?:No\.?|Number|Law|Decree)\s*\(?(\d+)\)?|\b(?:of|in)\s+((?:19|20)\d\d)\b"
+    r"|رقم\s*\(?\s*(\d+)\s*\)?|لسنة\s*((?:19|20)\d\d)", re.IGNORECASE)
 
 
 def law_numbers(text: str) -> set[str]:
     """Numbers a claim uses to name a law: "No. 45", "Law 33", "of 2021"."""
-    return {a or b for a, b in _LAW_NUMBER.findall(text)}
+    text = unicodedata.normalize("NFKC", text).translate(_ARABIC_DIGITS)
+    return {next(g for g in groups if g) for groups in _LAW_NUMBER.findall(text)}
 
 
 # Words that flip a claim's meaning. A claim may only use one its evidence uses.
+# Arabic ones count as the same class, so an Arabic claim's "لا" is backed by
+# an English source's "not".
 _NEGATIONS = frozenset("not no never cannot can't don't doesn't isn't aren't won't wasn't weren't "
-                       "shouldn't mustn't without nor none neither unable".split())
+                       "shouldn't mustn't without nor none neither unable "
+                       "لا ولا لم ولم لن ولن ليس ليست وليس غير دون بدون عدم بعدم".split())
 # Share of a claim's key words that must appear in its evidence.
 SUPPORT_MIN = 0.6
+# For a claim in another language than its sources, where words cannot be
+# compared: the least cosine similarity between the claim and its quotes by
+# the multilingual embedding model. Set on translated and mismatched pairs;
+# see docs/evaluation.md.
+CROSS_LANGUAGE_MIN = 0.55
 # How much of the passage before a quote counts as its context, so a list item
 # such as "b. Governmental entities" keeps the lead-in that gives it meaning.
 CONTEXT_CHARS = 200
 
 
 def _words(text: str) -> set[str]:
-    return set(re.findall(r"[a-z']+", unicodedata.normalize("NFKC", text).lower().translate(_FOLD)))
+    return set(re.findall(r"[a-z']+|[\u0621-\u064a]+", unicodedata.normalize("NFKC", text).lower().translate(_FOLD)))
+
+
+def clauses(text: str, size: int = 30) -> list[str]:
+    """A quote cut at sentence and clause marks, with long pieces cut again into
+    windows of `size` words that overlap by half, plus the whole quote."""
+    out = [text]
+    for piece in re.split(r"(?<=[.;:\u061b\u060c])\s+|,\s+(?=(?:and|or|provided|unless|if|which|who)\b)", text):
+        words = piece.split()
+        if len(words) < 4:
+            continue
+        if len(words) <= size + size // 2:
+            out.append(piece)
+        else:
+            out += [" ".join(words[i:i + size]) for i in range(0, len(words) - size // 2, size // 2)]
+    return list(dict.fromkeys(out))
+
+
+def _script(text: str) -> str:
+    """"ar" or "en": which script most of the letters in `text` are in."""
+    from dalil.lang import language
+    return language(text)
 
 
 def support(claim: str, evidence: str) -> float:
@@ -243,6 +274,8 @@ class Verifier:
     def __init__(self, passages: Mapping[str, Mapping[str, Any]], data_lookup: DataLookup | None = None,
                  allowed_sql: Iterable[str] | None = None, allowed_uncited: Iterable[str] | None = None,
                  allowed_passages: Iterable[str] | None = None, titles: Mapping[str, str] | None = None,
+                 laws: Mapping[str, Any] | None = None,
+                 similarity: Callable[[str, list[str]], list[float] | None] | None = None,
                  data_facts: Mapping[str, str] | None = None):
         """`allowed_sql`: the queries the pipeline itself ran. A data citation must
         name one of them exactly, so a drafter cannot write its own SQL, such as
@@ -263,6 +296,12 @@ class Verifier:
         # doc_id -> document title. A title such as "Federal Decree by Law No.
         # (45) of 2021" backs the law's own number and year in a claim.
         self.titles = dict(titles or {})
+        # doc_id -> dalil.laws.LawRef, for the check that a claim from one law
+        # is not presented as another law's. None or {} leaves it off.
+        self.laws = dict(laws or {})
+        # Meaning similarity for a claim in another language than its sources.
+        # Without it such a claim cannot be checked and is cut.
+        self.similarity = similarity
 
     def check_quote(self, citation: Mapping[str, Any]) -> CitationCheck:
         cit = dict(citation)
@@ -365,10 +404,25 @@ class Verifier:
             # A drafter may reword its sources. The claim's key words must mostly
             # be in them, and it may not add a negation they lack.
             evidence = " ".join(f"{c.context} {c.evidence}" for c in result.citations)
-            share = support(text, evidence)
-            if share < SUPPORT_MIN:
-                result.kept = False
-                result.reasons.append(f"claim is not supported by its sources (key words found: {share:.0%})")
+            if _script(text) != _script(" ".join(quotes)):
+                # Words cannot be matched across languages; compare meaning,
+                # against each clause of the quotes, since a claim usually
+                # renders one clause of a long legal sentence.
+                windows = [w for q in quotes for w in clauses(q)]
+                sims = (self.similarity(text, windows) or []) if self.similarity else []
+                if not sims:
+                    result.kept = False
+                    result.reasons.append("claim is in another language than its source, and no model is "
+                                          "available to compare them")
+                elif max(sims) < CROSS_LANGUAGE_MIN:
+                    result.kept = False
+                    result.reasons.append(f"claim does not match its source in meaning (similarity {max(sims):.2f}, "
+                                          f"needs {CROSS_LANGUAGE_MIN:.2f})")
+            else:
+                share = support(text, evidence)
+                if share < SUPPORT_MIN:
+                    result.kept = False
+                    result.reasons.append(f"claim is not supported by its sources (key words found: {share:.0%})")
             # Negations count as one class: "cannot" is backed by a source's "will not".
             # "No." in "Law No. 45" is a law reference, not a negation.
             added = sorted(_words(_LAW_NUMBER.sub(" ", text)) & _NEGATIONS)
@@ -377,12 +431,49 @@ class Verifier:
                 result.reasons.append("claim adds a negation its sources do not have: " + ", ".join(added))
         return result
 
+    def check_laws(self, checks: list[SentenceCheck]) -> None:
+        """Cut a claim that presents one law's text as another law's.
+
+        Two rules, on the kept claims of one answer:
+
+        1. A claim that names a law's jurisdiction ("the federal law", "the
+           Dubai law", "the UAE data protection law") must cite that
+           jurisdiction's law.
+        2. When the answer also cites other documents, a claim quoting a law
+           must name it, by its jurisdiction, number or short name. Otherwise
+           "The provisions of this Law will apply to Federal Government
+           Entities", from a Dubai law, reads as if it were about the federal
+           law the other sentences describe.
+        """
+        from dalil.laws import jurisdictions_named
+        kept = [s for s in checks if s.kept and s.kind not in UNCITED_KINDS]
+        docs_of = {id(s): {c.doc_id for c in s.citations if c.ok and c.doc_id} for s in kept}
+        for s in kept:
+            # Documents the other claims cite: a claim that cites a law and a
+            # page summarising it, alone in its answer, confuses no one.
+            all_docs = set().union(*(d for k, d in docs_of.items() if k != id(s)), docs_of[id(s)])
+            other_docs = set().union(*(d for k, d in docs_of.items() if k != id(s)))
+            refs = [self.laws[d] for d in docs_of[id(s)] if d in self.laws]
+            if not refs:
+                continue
+            named = jurisdictions_named(s.text)
+            if named and not any(r.jurisdiction in named for r in refs):
+                s.kept = False
+                s.reasons.append(f"names {' and '.join(sorted(named))} law but quotes {refs[0].label()}")
+                continue
+            same_law = {d for d in all_docs if d in self.laws and self.laws[d].key in {r.key for r in refs}}
+            if other_docs - same_law and not any(r.named_in(s.text) for r in refs):
+                s.kept = False
+                s.reasons.append(f"quotes {refs[0].label()} without naming it, next to other sources")
+
     def check_answer(self, sentences: Iterable[Mapping[str, Any]]) -> AnswerCheck:
         """Status from the claims. Caveats and refusals the pipeline adds do not
         count toward what was kept, so they cannot carry an answer whose claims
         were all cut. An answer that is only refusals, and all of them kept,
         passes: refusing is the right answer then."""
         checks = [self.check_sentence(s) for s in sentences]
+        if self.laws:
+            self.check_laws(checks)
         claims = [s for s in checks if s.kind not in UNCITED_KINDS]
         cut_claims = sum(not s.kept for s in claims)
         cut_other = sum(not s.kept for s in checks if s.kind in UNCITED_KINDS)

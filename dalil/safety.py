@@ -55,7 +55,15 @@ _EVASION = re.compile(
     r"|\bforg(?:e|ed|ing|ery)\b"
     r"|\bwithout\s+(?:getting\s+)?(?:caught|detected|noticed)\b"
     r"|\b(?:get|work)\s+around\s+(?:the\s+)?(?:rules|law|ban|system)\b"
-    r"|\b(?:evade|evading|circumvent)\b",
+    r"|\b(?:evade|evading|circumvent)\b"
+    # The same requests in Arabic: "ignore your rules", "evade", "get around",
+    # "forge", "stay or work without a fine", "without being caught".
+    r"|تجاهل\s+(?:كل\s+|جميع\s+)?(?:قواعدك|تعليماتك|القواعد|التعليمات|القوانين|الإرشادات|السياسات)"
+    r"|(?:التهرب|أتهرب|اتهرب|نتهرب|يتهرب|تهرب)\s+من"
+    r"|(?:التحايل|أتحايل|اتحايل|نتحايل|يتحايل|تحايل|الالتفاف|ألتف)\s+على"
+    r"|(?:تزوير|أزور|ازور|مزور|مزورة|مزيف|مزيفة)"
+    r"|(?:البقاء|أبقى|ابقى|الإقامة|أقيم|تجاوز|العمل|أعمل)[^.؟?!]*(?:دون|بدون|من\s+غير)\s+(?:دفع\s+)?(?:أي\s+)?(?:غرام|عقوب|مخالف)"
+    r"|(?:دون|بدون|من\s+غير)\s+(?:أن\s+)?(?:يكتشف|يُكتشف|ينكشف|يلاحظ|يمسك|يُمسك|أُكشف|اكتشاف)",
     re.IGNORECASE,
 )
 
@@ -67,7 +75,12 @@ ASK_FOR_DETAIL = "Please say which service or document you mean, so I can answer
 # question whose key words are all of this kind, such as "How long can I
 # stay?" or "What does it cost?", has no subject. Stems, as tokenize() makes.
 _GENERIC = frozenset("long much mani get need can take stay go work cost time day year do make use want "
-                     "allow possibl requir happen start finish valid".split())
+                     "allow possibl requir happen start finish valid".split()) | frozenset(
+    # The same words in Arabic, as tokenize() makes them: "how long can I stay?"
+    # is «كم من الوقت يمكنني البقاء؟».
+    tokenize("وقت الوقت مده مدة طويل طويلة يمكنني يمكن أستطيع استطيع أقدر احتاج أحتاج اريد أريد يجب البقاء "
+             "أبقى ابقى بقاء ابقي تكلفه تكلفة يكلف سعر يوم يوما أيام ايام سنه سنة شهر اشهر أشهر مسموح يسمح "
+             "أعمل اعمل العمل أذهب اذهب افعل أفعل اعرف أعرف صالح صالحة سارية ساري", stem=True))
 _PLACEHOLDER = re.compile(r"\[[A-Z ]+\]")
 
 
