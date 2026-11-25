@@ -91,6 +91,11 @@ _GENERIC = frozenset("long much mani get need can take stay go work cost time da
 _PLACEHOLDER = re.compile(r"\[[A-Z ]+\]")
 
 
+def subject_generic() -> frozenset[str]:
+    """Words that say what someone wants to know but not about what."""
+    return _GENERIC
+
+
 def subject_words(text: str) -> set[str]:
     """Key words that name a subject, without redaction placeholders."""
     return {t for t in tokenize(_PLACEHOLDER.sub(" ", text)) if t not in _GENERIC}

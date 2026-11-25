@@ -612,3 +612,20 @@ def test_soft_negations_are_backed_only_by_what_they_mean():
 ])
 def test_arabic_screen_round_three(q, refused):
     assert safety.screen(q).is_rule_evasion is refused
+
+
+def test_other_pages_join_a_subject_question_only_on_what_it_asks(tmp_path):
+    card = passage("sample-gold-card:p1:1", "Gold card holders can sponsor family members, including spouses and children.",
+                   page=1, kind="html")
+    permit = passage("sample-work-permits:p1:1", "Gold card holder work permit: granted to employers who hire a "
+                     "person holding a Gold card. The permit is valid for two years.", page=1, kind="html")
+    family = passage("sample-family:p1:1", "Gold card holders may also sponsor their parents if they meet the "
+                     "income rule.", page=1, kind="html")
+    ps = {p["passage_id"]: p for p in (card, permit, family)}
+    p = Pipeline(Store(tmp_path / "d.db"), FakeRetriever([as_hit(card), as_hit(permit), as_hit(family)]), ps,
+                 zetaris_factory=None)
+    p.titles = {"sample-gold-card": "Gold card", "sample-work-permits": "Work permits",
+                "sample-family": "Residence for families"}
+    p.laws = {}
+    got = [h.passage_id for h in p.search("Can a Gold card holder sponsor their parents?", set())]
+    assert got == [card["passage_id"], family["passage_id"]]  # the work permit line names the card but not the ask
