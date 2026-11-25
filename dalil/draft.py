@@ -542,9 +542,24 @@ class LLMDrafter:
                     "properties": {"text": {"type": "string", "minLength": 3},
                                    "citations": {"type": "array", "minItems": 1, "maxItems": 3, "items": cite}}}}}}
 
-    def complete(self, messages: list[dict[str, str]], schema: dict[str, Any]) -> str:
+    def translate(self, question: str) -> str:
+        """The question in English, for searching sources that are mostly in
+        English. Only the redacted question is sent, to the same local model."""
+        messages = [
+            {"role": "system", "content": "Translate the resident's question into plain English. Keep names of "
+                                          "services, laws and places. Reply with JSON only."},
+            {"role": "user", "content": question},
+        ]
+        schema = {"type": "object", "additionalProperties": False, "required": ["english"],
+                  "properties": {"english": {"type": "string", "minLength": 3, "maxLength": 400}}}
+        raw = self.complete(messages, schema, max_tokens=160, temperature=0.0)
+        return str(json.loads(raw).get("english") or "").strip()
+
+    def complete(self, messages: list[dict[str, str]], schema: dict[str, Any],
+                 max_tokens: int | None = None, temperature: float = 0.1) -> str:
         body = {
-            "model": self.model, "messages": messages, "temperature": 0.1, "max_tokens": self.max_tokens,
+            "model": self.model, "messages": messages, "temperature": temperature,
+            "max_tokens": max_tokens or self.max_tokens,
             "response_format": {"type": "json_schema", "json_schema": {"name": "answer", "schema": schema}},
         }
         if self.local:

@@ -51,6 +51,11 @@ def score(record, expected: set[str]) -> dict:
     }
 
 
+def _median(values) -> float | None:
+    got = [v for v in values if v is not None]
+    return statistics.median(got) if got else None
+
+
 def summarise(results: list[dict], questions: int, runs: int) -> dict:
     kept = sum(x["kept"] for x in results)
     right = sum(x["right"] for x in results)
@@ -62,6 +67,8 @@ def summarise(results: list[dict], questions: int, runs: int) -> dict:
         "claims_kept": kept, "claims_right": right,
         "claim_precision": round(right / kept, 3) if kept else None,
         "seconds_median": statistics.median(x["seconds"] for x in results) if results else None,
+        "prompt_tokens_median": _median(x.get("prompt_tokens") for x in results),
+        "output_tokens_median": _median(x.get("output_tokens") for x in results),
         "drafters": sorted({x["drafter"] for x in results}),
     }
 
@@ -104,9 +111,15 @@ def main() -> int:
             t0 = time.perf_counter()
             rec = pipeline.answer(r["question"])
             seconds = time.perf_counter() - t0
+            usage = getattr(getattr(drafter, "primary", None), "last_usage", {}) or {}
             res = {"id": r["id"], "run": run, "seconds": round(seconds, 1),
                    "drafter": getattr(drafter, "last_used", "") or type(drafter).__name__,
+                   # The model server's own counts for this answer's draft, when it drafted.
+                   "prompt_tokens": usage.get("prompt_n"), "output_tokens": usage.get("predicted_n"),
+                   "prompt_ms": usage.get("prompt_ms"), "output_ms": usage.get("predicted_ms"),
                    **score(rec, set(r["expected_docs"]))}
+            if getattr(drafter, "primary", None) is not None:
+                drafter.primary.last_usage = {}
             results.append(res)
             wrong = [d for d in res["cited_docs"] if not set(d) <= set(r["expected_docs"])]
             print(f"{r['id']} run {run}: {res['right']}/{res['kept']} right, found={res['found']} "

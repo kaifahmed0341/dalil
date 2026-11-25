@@ -8,6 +8,12 @@ the follow-up goes out with at least one kept claim and none of its claims
 cites a passage the rejected answer cited. A refusal counts as a miss here:
 the passages that answer the question are not all gone, so declining is not
 the right answer. Reports ids and counts only.
+
+To replay the state of the 25 November recording, where the rejected answer
+had cited four passages and the follow-up was declined:
+
+    --reject uae-employment-contracts:p1:3 uae-employment-contracts:p1:4 \
+             uae-terminating-employment-contracts:p1:4 uae-terminating-employment-contracts:p1:6
 """
 
 from __future__ import annotations
@@ -34,6 +40,9 @@ def main() -> int:
     ap.add_argument("--runs", type=int, default=10)
     ap.add_argument("--language", choices=sorted(QUESTIONS), default="en")
     ap.add_argument("--out", type=Path)
+    ap.add_argument("--reject", nargs="+", metavar="PASSAGE_ID",
+                    help="reject exactly these passages instead of the ones the first answer cites, to replay a "
+                         "recorded state; the first question is still asked and stored")
     args = ap.parse_args()
     q = QUESTIONS[args.language]
     drafter = FallbackDrafter(LLMDrafter(), ExtractiveDrafter())
@@ -44,7 +53,7 @@ def main() -> int:
         pipeline = Pipeline.from_build(store, drafter=drafter, memory=memory)
         first = pipeline.answer(q["S7.1"])
         store.review(first.id, "reject", "measure", q["S7.note"])
-        rejected = cited_passages(store.get(first.id)["check"])
+        rejected = args.reject or cited_passages(store.get(first.id)["check"])
         memory.remember("reject", first.id, first.question, "measure", rejected, note=q["S7.note"])
         second = pipeline.answer(q["S7.2"])
         cited = cited_passages(second.check)
