@@ -17,12 +17,13 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Callable
 
-from dalil import safety
+from dalil import lang, safety
 from dalil.draft import FEE_CAVEAT, LAW_CAVEAT, WEAK_REFUSAL, Drafter, ExtractiveDrafter, caveat, refusal
 from dalil.opendata import DataResult, match_rules, run_rules
 from dalil.retrieve import Hit, Searcher, make_retriever
 from dalil.store import Store
 from dalil.hmem import Guidance, guidance
+from dalil.laws import is_scope_question, law_refs, scope_passages
 from dalil.verify import Verifier, load_passages, zetaris_lookup
 
 def cited_passages(check: dict[str, Any] | None) -> list[str]:
@@ -41,11 +42,26 @@ def document_titles() -> dict[str, str]:
         return {}
 
 
-# The only caveat and refusal sentences that may go out without a citation.
-FIXED_UNCITED = frozenset({
+def manifest_laws() -> dict[str, Any]:
+    """doc_id -> LawRef for every numbered law in the manifest, or nothing."""
+    from dalil.corpus import load_manifest
+    try:
+        return law_refs(load_manifest())
+    except Exception as e:
+        print(f"warning: no law list for the checker ({type(e).__name__})", file=sys.stderr)
+        return {}
+
+
+# The only caveat and refusal sentences that may go out without a citation,
+# in every language Dalil answers in.
+FIXED_UNCITED = lang.all_fixed({
     WEAK_REFUSAL, FEE_CAVEAT, LAW_CAVEAT,
     safety.REFUSAL_TEXT, safety.REFUSAL_FOLLOW_UP, safety.PERSONAL_DATA_CAVEAT, safety.ASK_FOR_DETAIL,
 })
+# How many of the top hits are looked at for laws whose scope article a
+# question about a law's reach needs, and how many scope passages are added.
+SCOPE_FROM = 8
+SCOPE_ADD = 3
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_PASSAGES = REPO_ROOT / "build" / "passages.jsonl"
@@ -87,6 +103,7 @@ class Pipeline:
         # Review memory (dalil.hmem.HMem or a stand-in with recall()); None turns it off.
         self.memory = memory
         self.titles = document_titles()
+        self.laws = manifest_laws()
 
     @classmethod
     def from_build(cls, store: Store | None = None, passages_path: Path | str = DEFAULT_PASSAGES,
@@ -123,9 +140,38 @@ class Pipeline:
         return g
 
     def search(self, question: str, avoid: set[str]) -> list[Hit]:
-        """Top k hits, leaving out `avoid` and filling up from further down the ranking."""
+        """Top k hits, leaving out `avoid` and filling up from further down the ranking.
+
+        For a question about what a law covers, the scope article of each law
+        in the results comes first, in the question's language, because it is
+        the law's own answer and its wording is often too far from the
+        question's to rank high.
+        """
         hits = self.retriever.search(question, self.k + len(avoid))
-        return [h for h in hits if h.passage_id not in avoid][: self.k]
+        hits = [h for h in hits if h.passage_id not in avoid][: self.k]
+        if not is_scope_question(question) or not self.laws:
+            return hits
+        law_docs = list(dict.fromkeys(h.doc_id for h in hits[:SCOPE_FROM] if h.doc_id in self.laws))
+        have = {h.passage_id for h in hits}
+        question_lang = lang.language(question)
+        # The same law in the question's language, when the results only hold another.
+        keys = {self.laws[d].key for d in law_docs}
+        law_docs += [d for d, ref in self.laws.items() if ref.key in keys and d not in law_docs]
+        wanted = [d for d in law_docs if self._language(d) == question_lang] or law_docs
+        extra = [pid for pid in scope_passages(wanted, self.passages)
+                 if pid not in have and pid not in avoid][:SCOPE_ADD]
+        return [self._hit(pid) for pid in extra] + hits
+
+    def _language(self, doc_id: str) -> str:
+        for p in self.passages.values():
+            if p["doc_id"] == doc_id:
+                return p.get("language") or ""
+        return ""
+
+    def _hit(self, pid: str) -> Hit:
+        p = self.passages[pid]
+        return Hit(passage_id=pid, doc_id=p["doc_id"], page=int(p["page"]), score=0.0, heading=p.get("heading"),
+                   text=p["text"], start=int(p["start"]), end=int(p["end"]), kind=p.get("kind") or "")
 
     def answer(self, question: str) -> Record:
         screened = safety.screen(question)
@@ -174,6 +220,10 @@ class Pipeline:
             draft = self.drafter.draft(q, hits, data, notes=past.notes)
             if screened.has_personal_data:
                 draft = [*draft, caveat(safety.PERSONAL_DATA_CAVEAT)]
+        # Fixed refusals and caveats go out in the question's language.
+        question_lang = lang.language(q)
+        draft = [{**s, "text": lang.fixed(s["text"], question_lang)} if s.get("kind") in ("refusal", "caveat") else s
+                 for s in draft]
         ran = "fixed refusal" if (screened.is_rule_evasion or screened.is_vague) else (
             getattr(self.drafter, "last_used", "") or type(self.drafter).__name__)
         error = "" if (screened.is_rule_evasion or screened.is_vague) else getattr(self.drafter, "last_error", "")
@@ -186,7 +236,8 @@ class Pipeline:
             client, _ = self.zetaris()
         verifier = Verifier(self.passages, zetaris_lookup(client) if client else None,
                             allowed_sql=[d.sql for d in data], allowed_uncited=FIXED_UNCITED,
-                            allowed_passages=[h.passage_id for h in hits], titles=self.titles)
+                            allowed_passages=[h.passage_id for h in hits], titles=self.titles, laws=self.laws,
+                            similarity=getattr(self.retriever, "similarities", None))
         check = verifier.check_answer(draft).to_dict()
         kept = sum(s["kept"] for s in check["sentences"])
         self.store.event(qid, "verified", {"status": check["status"], "kept": kept,
