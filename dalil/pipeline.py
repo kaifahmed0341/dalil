@@ -279,6 +279,9 @@ class Pipeline:
         drafted = len(draft)
         draft = drop_repeats(draft, data)
         repeats = drafted - len(draft)
+        drafted = len(draft)
+        draft = drop_internal_names(draft, data)
+        internal = drafted - len(draft)
         draft, attached = attach_data(draft, data)
         if client is None and any("sql" in c for s in draft for c in s.get("citations") or []):
             client, _ = self.data_source()
@@ -298,7 +301,8 @@ class Pipeline:
                                            **({"data_restated": sum(1 for s in draft if s.get("restated"))}
                                               if added else {}),
                                            **({"data_citations_attached": attached} if attached else {}),
-                                           **({"repeats_dropped": repeats} if repeats else {})})
+                                           **({"repeats_dropped": repeats} if repeats else {}),
+                                           **({"internal_names_dropped": internal} if internal else {})})
         status = "held" if check["status"] == "held" else "awaiting_review"
         retrieval = [asdict(h) for h in hits]
         data_dicts = [d.to_dict() for d in data]
@@ -343,6 +347,17 @@ def drop_repeats(draft: list[dict[str, Any]], data: list[DataResult] = ()) -> li
             said |= nums
         out.append(s)
     return out
+
+
+def drop_internal_names(draft: list[dict[str, Any]], data: list[DataResult]) -> list[dict[str, Any]]:
+    """The draft without claims that name an open-data table, such as "The data
+    is from the open_ehs_medical_fitness table." A table name is Dalil's own
+    identifier and tells a resident nothing; the screen shows the source."""
+    names = {n.lower() for res in data for n in (res.table, res.table.split(".")[-1])}
+    if not names:
+        return draft
+    return [s for s in draft if s.get("kind", "claim") != "claim"
+            or not any(n in str(s.get("text", "")).lower() for n in names)]
 
 
 def attach_data(draft: list[dict[str, Any]], data: list[DataResult]) -> tuple[list[dict[str, Any]], int]:
