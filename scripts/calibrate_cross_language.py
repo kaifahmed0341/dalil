@@ -23,7 +23,7 @@ sys.path.insert(0, str(ROOT))
 from dalil.draft import units  # noqa: E402
 from dalil.embed import HTTPEmbedder  # noqa: E402
 from dalil.retrieve import HybridRetriever, Retriever  # noqa: E402
-from dalil.verify import CROSS_LANGUAGE_MIN, clauses, load_passages  # noqa: E402
+from dalil.verify import CROSS_LANGUAGE_MIN, RENDERING_MIN, clauses, load_passages  # noqa: E402
 
 
 def main() -> int:
@@ -48,6 +48,20 @@ def main() -> int:
         cut_right = sum(s < t and m for s, m in scored)
         mark = "  <- dalil/verify.py" if abs(t - CROSS_LANGUAGE_MIN) < 1e-9 else ""
         print(f"threshold {t:.2f}: {right}/{len(scored)} right, {passed_wrong} wrong claims kept, "
+              f"{cut_right} right claims cut{mark}")
+    # The check used when the writer gives an English version of its claim:
+    # the claim against that one English sentence. A right row carries a
+    # faithful English version; a wrong row is paired with the right row's.
+    english = {(r["passage_id"], r["unit"]): r["english"] for r in rows if r.get("english")}
+    pairs = [(max(sim(r["claim"], [r.get("english") or english[(r["passage_id"], r["unit"])]]) or [0.0]), r["match"])
+             for r in rows if r.get("english") or (r["passage_id"], r["unit"]) in english]
+    print("\nclaim against its English version:")
+    for t in [x / 100 for x in range(40, 86, 5)]:
+        right = sum((s >= t) == m for s, m in pairs)
+        kept_wrong = sum(s >= t and not m for s, m in pairs)
+        cut_right = sum(s < t and m for s, m in pairs)
+        mark = "  <- dalil/verify.py" if abs(t - RENDERING_MIN) < 1e-9 else ""
+        print(f"threshold {t:.2f}: {right}/{len(pairs)} right, {kept_wrong} wrong claims kept, "
               f"{cut_right} right claims cut{mark}")
     return 0
 

@@ -179,6 +179,11 @@ SUPPORT_MIN = 0.6
 # the multilingual embedding model. Set on translated and mismatched pairs;
 # see docs/evaluation.md.
 CROSS_LANGUAGE_MIN = 0.55
+# For a claim with the writer's English version of it: the least similarity
+# between the two sentences. On the 25 labelled pairs in
+# eval/cross-language-pairs.jsonl, faithful renderings scored 0.67 to 0.83
+# (one three-word fragment 0.47) and wrong ones at most 0.54.
+RENDERING_MIN = 0.60
 # How much of the passage before a quote counts as its context, so a list item
 # such as "b. Governmental entities" keeps the lead-in that gives it meaning.
 CONTEXT_CHARS = 200
@@ -268,6 +273,9 @@ class SentenceCheck:
     kept: bool
     reasons: list[str] = field(default_factory=list)
     citations: list[CitationCheck] = field(default_factory=list)
+    # For a claim in another language than its sources: the writer's English
+    # version of it, checked against the sources like an English claim.
+    text_en: str = ""
 
 
 @dataclass
@@ -293,6 +301,7 @@ class AnswerCheck:
             "sentences": [
                 {
                     "text": s.text, "kind": s.kind, "kept": s.kept, "reasons": s.reasons,
+                    **({"text_en": s.text_en} if s.text_en else {}),
                     "citations": [
                         {"ok": c.ok, "reason": c.reason, "doc_id": c.doc_id, "page": c.page,
                          "page_start": c.page_start, "page_end": c.page_end, **c.citation}
@@ -421,7 +430,7 @@ class Verifier:
     def check_sentence(self, sentence: Mapping[str, Any]) -> SentenceCheck:
         text = (sentence.get("text") or "").strip()
         kind = sentence.get("kind") or "claim"
-        result = SentenceCheck(text, kind, kept=True)
+        result = SentenceCheck(text, kind, kept=True, text_en=(sentence.get("text_en") or "").strip())
         citations = sentence.get("citations") or []
         if kind in UNCITED_KINDS:
             if self.allowed_uncited is not None and fold(text)[0] not in self.allowed_uncited:
@@ -463,7 +472,10 @@ class Verifier:
             # A drafter may reword its sources. The claim's key words must mostly
             # be in them, and it may not add a negation they lack.
             evidence = " ".join(f"{c.context} {c.evidence}" for c in result.citations)
-            if _script(text) != _script(" ".join(quotes)):
+            if _script(text) != _script(" ".join(quotes)) and result.text_en \
+                    and _script(result.text_en) == _script(" ".join(quotes)):
+                self.check_rendering(result, evidence, quotes)
+            elif _script(text) != _script(" ".join(quotes)):
                 # Words cannot be matched across languages; compare meaning,
                 # against each clause of the quotes, since a claim usually
                 # renders one clause of a long legal sentence.
@@ -501,6 +513,50 @@ class Verifier:
                 result.kept = False
                 result.reasons.append("claim adds a negation its sources do not have: " + ", ".join(added))
         return result
+
+    def check_rendering(self, result: SentenceCheck, evidence: str, quotes: list[str]) -> None:
+        """A claim in another language than its sources, with the writer's
+        English version of it. The English version is checked against the
+        sources as an English claim is: key words, numbers, negations, and
+        not stitched from two documents. Then the claim must say what its
+        English version says: the same numbers, a negation in one only if in
+        the other, and a meaning similarity of at least RENDERING_MIN between
+        the two sentences, which is a much closer test than a sentence
+        against a whole legal paragraph."""
+        text, en = result.text, result.text_en
+        backed = set().union(*(numbers(c.evidence) for c in result.citations))
+        titled = set().union(*(numbers(c.title) for c in result.citations)) & law_numbers(en)
+        missing = sorted(numbers(en) - backed - titled, key=lambda n: (len(n), n))
+        problems = []
+        if missing:
+            problems.append("its English version has numbers not in any cited source: " + ", ".join(missing))
+        share = support(en, evidence)
+        if share < SUPPORT_MIN:
+            problems.append(f"its English version is not supported by its sources (key words found: {share:.0%})")
+        en_neg = _negations(_words(_LAW_NUMBER.sub(" ", en)))
+        if en_neg and not _negations(_words(evidence)):
+            problems.append("its English version adds a negation its sources do not have: " + ", ".join(sorted(en_neg)))
+        if numbers(text) != numbers(en):
+            problems.append("it does not have the same numbers as its English version")
+        ar_neg = {w for w in _negations(_words(text))
+                  if not (w in _AR_SOFT_NEGATIONS and _words(en) & _SOFT_BACKING[w])}
+        if bool(ar_neg) != bool(en_neg):
+            problems.append("it negates where its English version does not, or the other way round")
+        if not problems:
+            sims = (self.similarity(text, [en]) or []) if self.similarity else []
+            if not sims:
+                problems.append("no model is available to compare it with its English version")
+            elif sims[0] < RENDERING_MIN:
+                problems.append(f"it does not say what its English version says (similarity {sims[0]:.2f}, "
+                                f"needs {RENDERING_MIN:.2f})")
+        if not problems and self.question:
+            gaps = self.stitched(en, result.citations)
+            if gaps:
+                problems.append("no one source says what the claim answers; missing from every single document: "
+                                + ", ".join(gaps))
+        if problems:
+            result.kept = False
+            result.reasons.extend(problems)
 
     def stitched(self, claim: str, citations: list[CitationCheck]) -> list[str]:
         """The claim's words that repeat the question and that no single cited

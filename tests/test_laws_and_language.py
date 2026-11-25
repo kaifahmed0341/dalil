@@ -629,3 +629,49 @@ def test_other_pages_join_a_subject_question_only_on_what_it_asks(tmp_path):
     p.laws = {}
     got = [h.passage_id for h in p.search("Can a Gold card holder sponsor their parents?", set())]
     assert got == [card["passage_id"], family["passage_id"]]  # the work permit line names the card but not the ask
+
+
+# --- Arabic claims with the writer's English version ----------------------------------
+
+
+def _rendering_verifier(score=0.8):
+    p = passage("sample-notice:p2:1", "The notice period must not be less than thirty days and must not exceed "
+                "ninety days.", kind="html")
+    return p, Verifier({p["passage_id"]: p}, similarity=lambda c, w: [score for _ in w])
+
+
+def _claim(p, ar, en):
+    return {"text": ar, "text_en": en, "citations": [{"passage_id": p["passage_id"], "quote": p["text"]}]}
+
+
+def test_arabic_claim_with_a_faithful_english_version_is_kept():
+    p, v = _rendering_verifier()
+    check = v.check_sentence(_claim(p, "يجب ألا تقل مدة الإشعار عن ثلاثين يوماً ولا تزيد على تسعين يوماً.",
+                                    "The notice period must not be less than thirty days and must not exceed ninety days."))
+    assert check.kept and check.text_en
+
+
+def test_english_version_is_checked_against_the_source():
+    p, v = _rendering_verifier()
+    check = v.check_sentence(_claim(p, "يجب ألا تقل مدة الإشعار عن ستين يوماً.",
+                                    "The notice period must not be less than sixty days."))
+    assert not check.kept
+    unsupported = v.check_sentence(_claim(p, "يحق للعامل إجازة سنوية مدفوعة الأجر.",
+                                          "The worker is entitled to paid annual leave every year."))
+    assert not unsupported.kept and "not supported" in unsupported.reasons[0]
+
+
+def test_arabic_must_match_its_english_version():
+    p, v = _rendering_verifier()
+    en = "The notice period must not be less than thirty days and must not exceed ninety days."
+    other_number = v.check_sentence(_claim(p, "يجب ألا تقل مدة الإشعار عن عشرين يوماً ولا تزيد على تسعين يوماً.", en))
+    assert not other_number.kept
+    _, far = _rendering_verifier(score=0.3)
+    unrelated = far.check_sentence(_claim(p, "يجب ألا تقل مدة الإشعار عن ثلاثين يوماً ولا تزيد على تسعين يوماً.", en))
+    assert not unrelated.kept and "does not say what its English version says" in unrelated.reasons[0]
+
+
+def test_writer_schema_asks_for_an_english_version_only_for_arabic():
+    numbered = {"S1": ("p", "The notice period must not be less than thirty days.")}
+    assert "english" in LLMDrafter.schema(numbered, [], rendering=True)["properties"]["sentences"]["items"]["required"]
+    assert "english" not in LLMDrafter.schema(numbered, [])["properties"]["sentences"]["items"]["properties"]
