@@ -185,6 +185,9 @@ def _open_list(unit: str) -> bool:
     return bool(re.search(r":\s", unit))
 
 
+_ECHOED_ID = re.compile(r"\[\s*S\d+\s*\]")
+
+
 def heading_like(unit: str) -> bool:
     """A heading or running page header rather than a sentence: short, no end
     mark, most words capitalised, as in "Scope of Application of the Decree by
@@ -622,8 +625,10 @@ class LLMDrafter:
         data_sqls = {d.sql for d in data if d.rows}
         out: list[dict[str, Any]] = []
         for s in (parsed.get("sentences") or [])[:5]:
-            text = str(s.get("text") or "").strip()
-            text_en = str(s.get("english") or "").strip()
+            # The model sometimes echoes the ids it was shown, "[S10] ...".
+            text = _ECHOED_ID.sub(" ", str(s.get("text") or "")).strip()
+            text = " ".join(text.split())
+            text_en = " ".join(_ECHOED_ID.sub(" ", str(s.get("english") or "")).split())
             cits = []
             for c in s.get("citations") or []:
                 if not isinstance(c, dict):

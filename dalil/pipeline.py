@@ -341,6 +341,7 @@ class Pipeline:
                             allowed_sql=[d.sql for d in data], allowed_uncited=FIXED_UNCITED,
                             allowed_passages=[h.passage_id for h in hits], titles=self.titles, laws=self.laws,
                             similarity=getattr(self.retriever, "similarities", None), question=english or q,
+                            language=question_lang,
                             subjects=subjects)
         check = verifier.check_answer(draft).to_dict()
         # Only for English questions: the extractive drafter matches words, and

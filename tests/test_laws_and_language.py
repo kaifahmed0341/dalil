@@ -7,6 +7,7 @@ All text here is synthetic: invented laws, invented articles, invented pages.
 
 from __future__ import annotations
 
+import json
 from collections import Counter
 
 import pytest
@@ -710,3 +711,21 @@ def test_rendering_ignores_attribution_and_bounds_and_cuts_stray_latin():
     slip = {**ok, "text": "يجب أن تكون مدة الإشعار 30 يوماً على الأقل و90 يوماً على الأكثر حسب acordo الطرفين."}
     check = v.check_sentence(slip)
     assert not check.kept and "acordo" in check.reasons[0]
+
+
+def test_a_claim_not_in_the_question_language_is_cut():
+    q = {"passage_id": PORTAL["passage_id"], "quote": PORTAL_QUOTE}
+    v = Verifier(PASSAGES, language="ar", similarity=lambda c, w: [0.9 for _ in w])
+    check = v.check_sentence({"text": PORTAL_QUOTE, "citations": [q]})
+    assert not check.kept and check.reasons == ["not written in the language of the question"]
+    assert Verifier(PASSAGES, language="en").check_sentence({"text": PORTAL_QUOTE, "citations": [q]}).kept
+
+
+def test_echoed_sentence_ids_are_removed_from_claims():
+    class Echo(LLMDrafter):
+        def complete(self, messages, schema, **kw):
+            return json.dumps({"sentences": [{"text": "[S1] The records law gives residents a right to see the "
+                                                     "personal records kept about them.",
+                                              "citations": [{"sentence": "S1"}]}]})
+    out = Echo().draft("Can I see my records?", [as_hit(PORTAL, 20.0)], [])
+    assert out[0]["text"].startswith("The records law")
