@@ -336,6 +336,7 @@ class Pipeline:
             "sentences": len(draft),
             "kinds": [s.get("kind", "claim") for s in draft],
         })
+        draft = facts_in_language(draft, data, question_lang)
         drafted = len(draft)
         draft = drop_repeats(draft, data)
         repeats = drafted - len(draft)
@@ -428,6 +429,24 @@ def drop_repeats(draft: list[dict[str, Any]], data: list[DataResult] = ()) -> li
             said |= nums
         out.append(s)
     return out
+
+
+def facts_in_language(draft: list[dict[str, Any]], data: list[DataResult], language: str
+                      ) -> list[dict[str, Any]]:
+    """A rule's English fact sentence in the question's language. The extractive
+    drafter, which answers when the model fails, writes every data fact from
+    the English template; for an Arabic question the Arabic one is used."""
+    if language != lang.ARABIC:
+        return draft
+    swap = {}
+    for res in data:
+        if res.rows and res.fact and res.fact_ar:
+            english = DataResult(res.table, res.sql, res.rows, fact=res.fact)
+            arabic = DataResult(res.table, res.sql, res.rows, fact=res.fact_ar)
+            for en, ar in zip(data_claims([english]), data_claims([arabic])):
+                swap[en["text"]] = ar["text"]
+    return [{**s, "text": swap[s["text"]]} if s.get("kind", "claim") == "claim" and s.get("text") in swap else s
+            for s in draft]
 
 
 def drop_internal_names(draft: list[dict[str, Any]], data: list[DataResult]) -> list[dict[str, Any]]:
