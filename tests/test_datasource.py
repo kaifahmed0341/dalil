@@ -435,3 +435,10 @@ def test_a_year_alone_attaches_nothing(tmp_path, local):
     ])
     rec = p.answer("How many Emirates ID cards does ICP renew in a year?")
     assert not any(c.get("sql") for c in rec.draft[0]["citations"])
+
+
+def test_a_claim_written_twice_is_checked_once(tmp_path, local):
+    text = "Renewal requests are made through the service centres or the official website of the authority."
+    p = scripted(tmp_path, local, [{"text": text, "kind": "claim", "citations": [QUOTE]}] * 3)
+    rec = p.answer("How do I renew my card?")
+    assert [s["text"] for s in rec.check["sentences"]].count(text) == 1
