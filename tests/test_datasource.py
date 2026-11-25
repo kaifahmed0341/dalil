@@ -491,3 +491,21 @@ def test_an_english_fact_from_the_fallback_is_said_in_arabic(tmp_path, local):
     rec = p.answer(q)
     kept = [s["text"] for s in rec.check["sentences"] if s["kept"]]
     assert kept and all("5856085" in t and "الهوية" in t for t in kept if any(ch.isdigit() for ch in t)), kept
+
+
+def test_a_data_backed_claim_is_not_treated_as_stitched_from_documents(local):
+    """The question-words check counts documents; a claim answered by a lookup is not
+    joined from two documents. Its wording is still checked against its sources."""
+    passages = {p["passage_id"]: dict(p) for p in PASSAGES}
+    passages["doc-b:p1:1"] = {**passages["doc-a:p1:2"], "passage_id": "doc-b:p1:1", "doc_id": "doc-b"}
+    cit = {"table": MEDICAL.table, "sql": MEDICAL.sql, "column": "exams", "value": "1424313"}
+    v = Verifier(passages, data_lookup(local), allowed_sql=[MEDICAL.sql], data_facts={MEDICAL.sql: MEDICAL.fact},
+                 question="How many medical fitness exams does Emirates Health Services carry out?")
+    q2 = {"passage_id": "doc-b:p1:1", "quote": QUOTE["quote"]}
+    claim = {"text": "Emirates Health Services carried out 1424313 medical fitness exams.",
+             "citations": [cit, QUOTE, q2]}
+    out = v.check_answer([claim]).sentences[0]
+    assert out.kept, out.reasons
+    # Without a data value in the sentence the documents check still applies as before.
+    plain = {"text": "Emirates Health Services carried out medical fitness exams.", "citations": [QUOTE, q2]}
+    assert not v.check_answer([plain]).sentences[0].kept

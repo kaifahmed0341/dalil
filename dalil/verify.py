@@ -456,6 +456,13 @@ class Verifier:
         asked = {t for t in tokenize(claim) if not t.isdigit()} & set(tokenize(self.question))
         if not asked:
             return []
+        # A claim that states a value its data citation reran answers from that
+        # lookup, not from documents joined together; its wording is still
+        # checked against its sources and the rule's own sentence above.
+        stated = numbers(claim)
+        if any(c.ok and c.citation.get("sql") and numbers(str(c.citation.get("value") or "")) <= stated
+               and numbers(str(c.citation.get("value") or "")) for c in citations):
+            return []
         by_doc: dict[str, set[str]] = {}
         for c in citations:
             if c.ok and c.doc_id:
