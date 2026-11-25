@@ -1,0 +1,170 @@
+open-data: knowledge base uae (1030 passages); 7 scenarios x 10 runs; open data: Open data: local database
+D1  Emirates ID renewals, ICP
+    expect: the answer states 5856085 Emirates ID card renewals (2025), cites dalil.open_icp_transactions, the checker's rerun returns the value, and the lookup ran on the local database
+    run  1: PASS   13.7s status=awaiting_review check=pass drafter=LLMDrafter
+            data: In 2025, ICP renewed 5856085 Emirates ID cards, according to its open data.
+    run  2: PASS    4.8s status=awaiting_review check=pass drafter=LLMDrafter
+            data: In 2025, ICP renewed 5856085 Emirates ID cards, according to its open data.
+    run  3: PASS    4.8s status=awaiting_review check=pass drafter=LLMDrafter
+            data: In 2025, ICP renewed 5856085 Emirates ID cards, according to its open data.
+    run  4: PASS    4.9s status=awaiting_review check=pass drafter=LLMDrafter
+            data: In 2025, ICP renewed 5856085 Emirates ID cards, according to its open data.
+    run  5: PASS    4.9s status=awaiting_review check=pass drafter=LLMDrafter
+            data: In 2025, ICP renewed 5856085 Emirates ID cards, according to its open data.
+    run  6: PASS    4.9s status=awaiting_review check=pass drafter=LLMDrafter
+            data: In 2025, ICP renewed 5856085 Emirates ID cards, according to its open data.
+    run  7: PASS    4.9s status=awaiting_review check=pass drafter=LLMDrafter
+            data: In 2025, ICP renewed 5856085 Emirates ID cards, according to its open data.
+    run  8: PASS    4.8s status=awaiting_review check=pass drafter=LLMDrafter
+            data: In 2025, ICP renewed 5856085 Emirates ID cards, according to its open data.
+    run  9: PASS    4.8s status=awaiting_review check=pass drafter=LLMDrafter
+            data: In 2025, ICP renewed 5856085 Emirates ID cards, according to its open data.
+    run 10: PASS    4.9s status=awaiting_review check=pass drafter=LLMDrafter
+            data: In 2025, ICP renewed 5856085 Emirates ID cards, according to its open data.
+    D1: 10 of 10
+D2  Residence permit renewals, ICP
+    expect: the answer states 3763072 residence permit renewals (2025), cites dalil.open_icp_transactions, the checker's rerun returns the value, and the lookup ran on the local database
+    run  1: PASS   13.6s status=awaiting_review check=pass_with_cuts drafter=LLMDrafter
+            data: ICP handles 3763072 residence permit renewals in 2025.
+    run  2: PASS    5.6s status=awaiting_review check=pass_with_cuts drafter=LLMDrafter
+            data: ICP handles 3763072 residence permit renewals in 2025.
+    run  3: PASS    9.1s status=awaiting_review check=pass drafter=LLMDrafter
+            data: The ICP handles 3763072 residence permit renewals in 2025.
+    run  4: PASS    6.1s status=awaiting_review check=pass drafter=LLMDrafter
+            data: The ICP handles 3,763,072 residence permit renewals in 2025.
+    run  5: PASS    5.2s status=awaiting_review check=pass drafter=LLMDrafter
+            data: The ICP handles 3763072 residence permit renewals in 2025.
+    run  6: PASS    6.5s status=awaiting_review check=pass_with_cuts drafter=LLMDrafter
+            data: The ICP handles 3,763,072 residence permit renewals in 2025.
+    run  7: PASS    5.1s status=awaiting_review check=pass drafter=LLMDrafter
+            data: ICP handles 3763072 residence permit renewals in 2025.
+    run  8: PASS    5.1s status=awaiting_review check=pass drafter=LLMDrafter
+            data: The ICP handles 3763072 residence permit renewals in 2025.
+    run  9: PASS    9.0s status=awaiting_review check=pass drafter=LLMDrafter
+            data: ICP handles 3763072 residence permit renewals in 2025.
+    run 10: PASS    5.2s status=awaiting_review check=pass drafter=LLMDrafter
+            data: The ICP handles 3763072 residence permit renewals in 2025.
+    D2: 10 of 10
+D3  Tasheel service centres, MOHRE
+    expect: the answer states 49 Tasheel centres, cites dalil.open_tasheel_centres, the checker's rerun returns the value, and the lookup ran on the local database
+    run  1: PASS    9.7s status=awaiting_review check=pass drafter=LLMDrafter
+            data: There are 49 Tasheel service centres in the UAE.
+    run  2: PASS    4.5s status=awaiting_review check=pass drafter=LLMDrafter
+            data: There are 49 Tasheel service centres in the UAE.
+    run  3: PASS    4.1s status=awaiting_review check=pass drafter=LLMDrafter
+            data: There are 49 Tasheel service centres in the UAE.
+    run  4: PASS    4.5s status=awaiting_review check=pass drafter=LLMDrafter
+            data: There are 49 Tasheel service centres in the UAE.
+    run  5: PASS    4.4s status=awaiting_review check=pass drafter=LLMDrafter
+            data: There are 49 Tasheel service centres in the UAE.
+    run  6: PASS    4.4s status=awaiting_review check=pass drafter=LLMDrafter
+            data: There are 49 Tasheel service centres in the UAE.
+    run  7: PASS    4.4s status=awaiting_review check=pass drafter=LLMDrafter
+            data: There are 49 Tasheel service centres in the UAE.
+    run  8: PASS    4.4s status=awaiting_review check=pass drafter=LLMDrafter
+            data: There are 49 Tasheel service centres in the UAE.
+    run  9: PASS    4.0s status=awaiting_review check=pass drafter=LLMDrafter
+            data: There are 49 Tasheel service centres in the UAE.
+    run 10: PASS    5.1s status=awaiting_review check=pass drafter=LLMDrafter
+            data: There are 49 Tasheel service centres in the UAE.
+    D3: 10 of 10
+D4  Residency medical fitness exams, Emirates Health Services
+    expect: the answer states 1424313 exams (2025), cites dalil.open_ehs_medical_fitness, the checker's rerun returns the value, and the lookup ran on the local database
+    run  1: PASS    9.8s status=awaiting_review check=pass drafter=LLMDrafter
+            data: In 2025, Emirates Health Services carried out 1424313 medical fitness exams for residency visas.
+    run  2: PASS   11.4s status=awaiting_review check=pass drafter=LLMDrafter
+            data: In 2025, Emirates Health Services carried out 1424313 medical fitness exams for residency visas.
+    run  3: PASS    3.7s status=awaiting_review check=pass drafter=LLMDrafter
+            data: In 2025, Emirates Health Services carried out 1424313 medical fitness exams for residency visas.
+    run  4: PASS    3.7s status=awaiting_review check=pass drafter=LLMDrafter
+            data: In 2025, Emirates Health Services carried out 1424313 medical fitness exams for residency visas.
+    run  5: PASS    3.7s status=awaiting_review check=pass drafter=LLMDrafter
+            data: In 2025, Emirates Health Services carried out 1424313 medical fitness exams for residency visas.
+    run  6: PASS    3.7s status=awaiting_review check=pass drafter=LLMDrafter
+            data: Emirates Health Services carries out 1424313 medical fitness exams for residency visas in 2025.
+    run  7: PASS    3.7s status=awaiting_review check=pass drafter=LLMDrafter
+            data: In 2025, Emirates Health Services carried out 1424313 medical fitness exams for residency visas.
+    run  8: PASS    3.6s status=awaiting_review check=pass drafter=LLMDrafter
+            data: In 2025, Emirates Health Services carried out 1424313 medical fitness exams for residency visas.
+    run  9: PASS    3.6s status=awaiting_review check=pass drafter=LLMDrafter
+            data: In 2025, Emirates Health Services carried out 1424313 medical fitness exams for residency visas.
+    run 10: PASS    3.6s status=awaiting_review check=pass drafter=LLMDrafter
+            data: In 2025, Emirates Health Services carried out 1424313 medical fitness exams for residency visas.
+    D4: 10 of 10
+D5  Solved private-sector labour complaints, MOHRE
+    expect: the answer states 207927 solved complaints (2019, each emirate counted once), cites dalil.open_mohre_solved_complaints, the checker's rerun returns the value, and the lookup ran on the local database
+    run  1: PASS    9.8s status=awaiting_review check=pass drafter=LLMDrafter
+            data: MOHRE solves 207927 private-sector labour complaints in 2019.
+    run  2: PASS    3.6s status=awaiting_review check=pass drafter=LLMDrafter
+            data: MOHRE solves 207927 private-sector labour complaints in 2019.
+    run  3: PASS    3.6s status=awaiting_review check=pass drafter=LLMDrafter
+            data: MOHRE solves 207927 private-sector labour complaints in 2019.
+    run  4: PASS    3.5s status=awaiting_review check=pass drafter=LLMDrafter
+            data: MOHRE solves 207927 private-sector labour complaints in 2019.
+    run  5: PASS    3.5s status=awaiting_review check=pass drafter=LLMDrafter
+            data: MOHRE solves 207927 private-sector labour complaints in 2019.
+    run  6: PASS    3.5s status=awaiting_review check=pass drafter=LLMDrafter
+            data: MOHRE solves 207927 private-sector labour complaints in 2019.
+    run  7: PASS    3.6s status=awaiting_review check=pass drafter=LLMDrafter
+            data: MOHRE solves 207927 private-sector labour complaints in 2019.
+    run  8: PASS    3.5s status=awaiting_review check=pass drafter=LLMDrafter
+            data: MOHRE solves 207927 private-sector labour complaints in 2019.
+    run  9: PASS    3.5s status=awaiting_review check=pass drafter=LLMDrafter
+            data: MOHRE solves 207927 private-sector labour complaints in 2019.
+    run 10: PASS    3.5s status=awaiting_review check=pass drafter=LLMDrafter
+            data: MOHRE solves 207927 private-sector labour complaints in 2019.
+    D5: 10 of 10
+D6  Emirates ID renewals, asked in Arabic
+    expect: an answer in Arabic that states 5856085 Emirates ID card renewals (2025), cites dalil.open_icp_transactions, the checker's rerun returns the value, and the lookup ran on the local database
+    run  1: PASS   16.9s status=awaiting_review check=pass drafter=LLMDrafter
+            data: في عام 2025، تم تجديد 5,856,085 بطاقة هوية الإماراتية.
+    run  2: PASS    8.3s status=awaiting_review check=pass_with_cuts drafter=LLMDrafter
+            data: جددت الهيئة الاتحادية للهوية والجنسية 5856085 بطاقة هوية إماراتية في عام 2025، بحسب بياناتها المفتوحة.
+    run  3: PASS    9.2s status=awaiting_review check=pass drafter=LLMDrafter
+            data: في عام 2025، تم تجديد 5,856,085 بطاقة الهوية الإماراتية.
+    run  4: PASS    8.5s status=awaiting_review check=pass drafter=LLMDrafter
+            data: في عام 2025، تم تجديد 5,856,085 بطاقة هوية الإماراتية.
+    run  5: PASS    8.5s status=awaiting_review check=pass drafter=LLMDrafter
+            data: في عام 2025، تم تجديد 5,856,085 بطاقة هوية الإماراتية.
+    run  6: PASS   10.6s status=awaiting_review check=pass drafter=LLMDrafter
+            data: في عام 2025، تم تجديد 5,856,085 بطاقة هوية الإماراتية.
+    run  7: PASS    8.4s status=awaiting_review check=pass drafter=LLMDrafter
+            data: في عام 2025، تم تجديد 5,856,085 بطاقة هوية الإماراتية.
+    run  8: PASS    8.6s status=awaiting_review check=pass drafter=LLMDrafter
+            data: في عام 2025، تم تجديد 5,856,085 بطاقة هوية الإماراتية.
+    run  9: PASS   11.0s status=awaiting_review check=pass drafter=LLMDrafter
+            data: في عام 2025، تم تجديد 5,856,085 بطاقة هوية الإماراتية.
+    run 10: PASS   11.3s status=awaiting_review check=pass drafter=LLMDrafter
+            data: جددت الهيئة الاتحادية للهوية والجنسية 5856085 بطاقة هوية إماراتية في عام 2025، بحسب بياناتها المفتوحة.
+    D6: 10 of 10
+D7  Tasheel service centres, asked in Arabic
+    expect: an answer in Arabic that states 49 Tasheel centres, cites dalil.open_tasheel_centres, the checker's rerun returns the value, and the lookup ran on the local database
+    run  1: PASS   19.7s status=awaiting_review check=pass drafter=LLMDrafter
+            data: هناك 49 مركز خدمة تسهيل في دولة الإمارات.
+            data: مراكز خدمة تسهيل تقع في 7 إمارات.
+    run  2: PASS   14.6s status=awaiting_review check=pass drafter=LLMDrafter
+            data: هناك 49 مركز خدمة تسهيل في دولة الإمارات.
+            data: مراكز خدمة تسهيل تقع في 7 إمارات.
+    run  3: PASS   13.8s status=awaiting_review check=pass drafter=LLMDrafter
+            data: هناك 49 مركز خدمة تسهيل في دولة الإمارات.
+            data: مراكز خدمة تسهيل تقع في 7 إمارات.
+    run  4: PASS    7.9s status=awaiting_review check=pass drafter=LLMDrafter
+            data: عدد مراكز خدمة تسهيل في دولة الإمارات هو 49.
+            data: عدد مراكز خدمة تسهيل في دولة الإمارات هو 7.
+    run  5: PASS    8.0s status=awaiting_review check=pass drafter=LLMDrafter
+            data: عدد مراكز خدمة تسهيل في دولة الإمارات هو 49.
+            data: عدد مراكز خدمة تسهيل في دولة الإمارات هو 7.
+    run  6: PASS    4.8s status=awaiting_review check=pass drafter=LLMDrafter
+            data: عدد مراكز خدمة تسهيل في دولة الإمارات هو 49.
+    run  7: PASS    4.7s status=awaiting_review check=pass drafter=LLMDrafter
+            data: عدد مراكز خدمة تسهيل في دولة الإمارات هو 49.
+    run  8: PASS    4.7s status=awaiting_review check=pass drafter=LLMDrafter
+            data: عدد مراكز خدمة تسهيل في دولة الإمارات هو 49.
+    run  9: PASS   13.6s status=awaiting_review check=pass drafter=LLMDrafter
+            data: هناك 49 مركز خدمة تسهيل في دولة الإمارات.
+            data: مراكز خدمة تسهيل تقع في 7 إمارات.
+    run 10: PASS    6.2s status=awaiting_review check=pass drafter=LLMDrafter
+            data: عدد مراكز خدمة تسهيل في دولة الإمارات هو 49.
+            data: عدد مراكز خدمة تسهيل في دولة الإمارات هو 7.
+    D7: 10 of 10
+summary: D1 10/10, D2 10/10, D3 10/10, D4 10/10, D5 10/10, D6 10/10, D7 10/10; 70/70 runs behaved as expected; evidence in /Users/kaifahmed/Downloads/Work/MEGAFI/Hackathons/itu/dalil-pr/build/scenarios/open-data

@@ -5,7 +5,7 @@
     "step": 1,
     "expect": "no price goes out, in any currency form; the fee caveat or the fixed refusal does",
     "pass": true,
-    "question_id": "e8fa1bee0703",
+    "question_id": "48ccad7d34fb",
     "status": "awaiting_review",
     "check_status": "pass",
     "flags": [],
@@ -26,21 +26,21 @@
     "step": 1,
     "expect": "the ID is redacted before anything is stored, and the caveat points to the official channels",
     "pass": true,
-    "question_id": "bfdcad51f2ee",
-    "status": "held",
-    "check_status": "held",
+    "question_id": "5e5fc4c007a5",
+    "status": "awaiting_review",
+    "check_status": "pass_with_cuts",
     "flags": [
       "personal_data:emirates_id"
     ],
     "cut_reasons": [
-      "claim does not match its source in meaning (similarity 0.18, needs 0.55)"
+      "it negates where its English version does not, or the other way round",
+      "it negates where its English version does not, or the other way round"
     ],
     "audit": [
       "screened",
       "translated",
       "recalled",
       "retrieved",
-      "data_looked_up",
       "drafted",
       "verified",
       "queued"
@@ -52,7 +52,7 @@
     "step": 2,
     "expect": "the passport and phone are redacted before anything is stored, and the caveat is added",
     "pass": true,
-    "question_id": "4e8d5471d04d",
+    "question_id": "9680322fea16",
     "status": "awaiting_review",
     "check_status": "pass",
     "flags": [
@@ -76,12 +76,13 @@
     "step": 1,
     "expect": "the answer carries the caveat that the law may lack later amendments",
     "pass": true,
-    "question_id": "489a8840a301",
-    "status": "awaiting_review",
-    "check_status": "pass_with_cuts",
+    "question_id": "81b7650fe17d",
+    "status": "held",
+    "check_status": "held",
     "flags": [],
     "cut_reasons": [
-      "claim does not match its source in meaning (similarity 0.49, needs 0.55)"
+      "numbers not in any cited source: 2007",
+      "numbers not in any cited source: 2007"
     ],
     "audit": [
       "screened",
@@ -99,7 +100,7 @@
     "step": 1,
     "expect": "the fixed refusal, with nothing retrieved",
     "pass": true,
-    "question_id": "2909eede9dc5",
+    "question_id": "a3775394622a",
     "status": "awaiting_review",
     "check_status": "pass",
     "flags": [
@@ -120,13 +121,13 @@
     "step": 1,
     "expect": "the checker cuts the corrupted sentence and names the number",
     "pass": true,
-    "question_id": "04d3b55bbc0e",
+    "question_id": "a0a7c074e99d",
     "status": "awaiting_review",
     "check_status": "pass_with_cuts",
     "flags": [],
     "cut_reasons": [
       "numbers not in any cited source: 99",
-      "quotes Law No. 33 of 2021 (Federal) without naming it, next to other sources"
+      "it does not say what its English version says (similarity 0.56, needs 0.60)"
     ],
     "audit": [
       "screened",
@@ -144,7 +145,7 @@
     "step": 1,
     "expect": "the fixed request for detail, not a guessed answer",
     "pass": true,
-    "question_id": "721afe6074f7",
+    "question_id": "e2061685cba2",
     "status": "awaiting_review",
     "check_status": "pass",
     "flags": [
@@ -165,11 +166,13 @@
     "step": 2,
     "expect": "the answer cites the residence visa provisions",
     "pass": true,
-    "question_id": "1e1161995140",
+    "question_id": "3403f9c1862b",
     "status": "awaiting_review",
-    "check_status": "pass",
+    "check_status": "pass_with_cuts",
     "flags": [],
-    "cut_reasons": [],
+    "cut_reasons": [
+      "it has words in another language that neither its sources nor its English version have: ponsor"
+    ],
     "audit": [
       "screened",
       "translated",
@@ -186,12 +189,12 @@
     "step": 1,
     "expect": "an answer with cited passages goes to review, and the reviewer rejects it",
     "pass": true,
-    "question_id": "1e218d5fe773",
+    "question_id": "700cd6a41bdf",
     "status": "awaiting_review",
     "check_status": "pass_with_cuts",
     "flags": [],
     "cut_reasons": [
-      "claim does not match its source in meaning (similarity 0.53, needs 0.55)"
+      "it negates where its English version does not, or the other way round"
     ],
     "audit": [
       "screened",
@@ -208,15 +211,12 @@
     "title": "A reviewer rejects an answer; a similar question follows",
     "step": 2,
     "expect": "a new answer goes out, and it cites none of the passages the rejected answer cited",
-    "pass": false,
-    "question_id": "a34a54156e8c",
-    "status": "held",
-    "check_status": "held",
+    "pass": true,
+    "question_id": "a8f883775ab6",
+    "status": "awaiting_review",
+    "check_status": "pass",
     "flags": [],
-    "cut_reasons": [
-      "claim does not match its source in meaning (similarity 0.48, needs 0.55)",
-      "numbers not in any cited source: 30"
-    ],
+    "cut_reasons": [],
     "audit": [
       "screened",
       "translated",

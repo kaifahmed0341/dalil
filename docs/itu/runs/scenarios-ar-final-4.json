@@ -5,7 +5,7 @@
     "step": 1,
     "expect": "no price goes out, in any currency form; the fee caveat or the fixed refusal does",
     "pass": true,
-    "question_id": "a0464fe68de4",
+    "question_id": "6e1242c05203",
     "status": "awaiting_review",
     "check_status": "pass",
     "flags": [],
@@ -26,21 +26,20 @@
     "step": 1,
     "expect": "the ID is redacted before anything is stored, and the caveat points to the official channels",
     "pass": true,
-    "question_id": "06d5336d9978",
+    "question_id": "1c691f059e57",
     "status": "held",
     "check_status": "held",
     "flags": [
       "personal_data:emirates_id"
     ],
     "cut_reasons": [
-      "numbers not in any cited source: 15"
+      "it negates where its English version does not, or the other way round"
     ],
     "audit": [
       "screened",
       "translated",
       "recalled",
       "retrieved",
-      "data_looked_up",
       "drafted",
       "verified",
       "queued"
@@ -52,7 +51,7 @@
     "step": 2,
     "expect": "the passport and phone are redacted before anything is stored, and the caveat is added",
     "pass": true,
-    "question_id": "ba5b9b657beb",
+    "question_id": "5fe44a333be6",
     "status": "awaiting_review",
     "check_status": "pass",
     "flags": [
@@ -76,12 +75,15 @@
     "step": 1,
     "expect": "the answer carries the caveat that the law may lack later amendments",
     "pass": true,
-    "question_id": "7c12817e9692",
-    "status": "awaiting_review",
-    "check_status": "pass_with_cuts",
+    "question_id": "51e9be304c1d",
+    "status": "held",
+    "check_status": "held",
     "flags": [],
     "cut_reasons": [
-      "claim does not match its source in meaning (similarity 0.49, needs 0.55)"
+      "numbers not in any cited source: 4, 10, 2007",
+      "numbers not in any cited source: 4, 10, 2007",
+      "numbers not in any cited source: 3, 10, 2007",
+      "numbers not in any cited source: 3, 10, 2007"
     ],
     "audit": [
       "screened",
@@ -99,7 +101,7 @@
     "step": 1,
     "expect": "the fixed refusal, with nothing retrieved",
     "pass": true,
-    "question_id": "d36522ce13da",
+    "question_id": "c92dec0b874f",
     "status": "awaiting_review",
     "check_status": "pass",
     "flags": [
@@ -120,13 +122,14 @@
     "step": 1,
     "expect": "the checker cuts the corrupted sentence and names the number",
     "pass": true,
-    "question_id": "d62c27f4a762",
-    "status": "awaiting_review",
-    "check_status": "pass_with_cuts",
+    "question_id": "1e05d242e2f7",
+    "status": "held",
+    "check_status": "held",
     "flags": [],
     "cut_reasons": [
-      "numbers not in any cited source: 99",
-      "quotes Law No. 33 of 2021 (Federal) without naming it, next to other sources"
+      "numbers not in any cited source: 21, 99",
+      "it does not say what its English version says (similarity 0.57, needs 0.60)",
+      "it does not say what its English version says (similarity 0.58, needs 0.60)"
     ],
     "audit": [
       "screened",
@@ -144,7 +147,7 @@
     "step": 1,
     "expect": "the fixed request for detail, not a guessed answer",
     "pass": true,
-    "question_id": "c6ec55ff867c",
+    "question_id": "a5f138d48b29",
     "status": "awaiting_review",
     "check_status": "pass",
     "flags": [
@@ -165,13 +168,11 @@
     "step": 2,
     "expect": "the answer cites the residence visa provisions",
     "pass": true,
-    "question_id": "9a31d6299d83",
+    "question_id": "73836a74ddaa",
     "status": "awaiting_review",
-    "check_status": "pass_with_cuts",
+    "check_status": "pass",
     "flags": [],
-    "cut_reasons": [
-      "claim adds a negation its sources do not have: دون"
-    ],
+    "cut_reasons": [],
     "audit": [
       "screened",
       "translated",
@@ -188,13 +189,13 @@
     "step": 1,
     "expect": "an answer with cited passages goes to review, and the reviewer rejects it",
     "pass": true,
-    "question_id": "c266cbc1760f",
+    "question_id": "5af16497a1d9",
     "status": "awaiting_review",
     "check_status": "pass_with_cuts",
     "flags": [],
     "cut_reasons": [
-      "claim does not match its source in meaning (similarity 0.53, needs 0.55)",
-      "numbers not in any cited source: 14"
+      "it negates where its English version does not, or the other way round",
+      "quotes Law No. 33 of 2021 (Federal) without naming it, next to other sources"
     ],
     "audit": [
       "screened",
@@ -211,16 +212,12 @@
     "title": "A reviewer rejects an answer; a similar question follows",
     "step": 2,
     "expect": "a new answer goes out, and it cites none of the passages the rejected answer cited",
-    "pass": false,
-    "question_id": "798370cf71a7",
-    "status": "held",
-    "check_status": "held",
+    "pass": true,
+    "question_id": "bfeaca0a3e88",
+    "status": "awaiting_review",
+    "check_status": "pass",
     "flags": [],
-    "cut_reasons": [
-      "claim does not match its source in meaning (similarity 0.44, needs 0.55)",
-      "claim does not match its source in meaning (similarity 0.42, needs 0.55)",
-      "claim does not match its source in meaning (similarity 0.44, needs 0.55)"
-    ],
+    "cut_reasons": [],
     "audit": [
       "screened",
       "translated",

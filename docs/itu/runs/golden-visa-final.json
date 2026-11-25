@@ -6,12 +6,12 @@
   "answered": 10,
   "found": 10,
   "clean": 10,
-  "claims_kept": 27,
-  "claims_right": 27,
+  "claims_kept": 23,
+  "claims_right": 23,
   "claim_precision": 1.0,
-  "seconds_median": 6.9,
+  "seconds_median": 3.6,
   "prompt_tokens_median": 4.0,
-  "output_tokens_median": 91.0,
+  "output_tokens_median": 100.0,
   "drafters": [
    "LLMDrafter"
   ]
@@ -20,17 +20,20 @@
   {
    "id": "c41",
    "run": 1,
-   "seconds": 16.5,
+   "seconds": 12.1,
    "drafter": "LLMDrafter",
-   "prompt_tokens": 4,
-   "output_tokens": 210,
-   "prompt_ms": 490.072,
-   "output_ms": 14908.517,
+   "prompt_tokens": 1269,
+   "output_tokens": 231,
+   "prompt_ms": 3695.255,
+   "output_ms": 7773.093,
    "status": "awaiting_review",
    "check": "pass",
-   "kept": 3,
-   "right": 3,
+   "kept": 4,
+   "right": 4,
    "cited_docs": [
+    [
+     "uae-golden-visa"
+    ],
     [
      "uae-golden-visa"
     ],
@@ -47,23 +50,17 @@
   {
    "id": "c41",
    "run": 2,
-   "seconds": 12.1,
+   "seconds": 3.6,
    "drafter": "LLMDrafter",
    "prompt_tokens": 4,
-   "output_tokens": 167,
-   "prompt_ms": 153.124,
-   "output_ms": 11788.188,
+   "output_tokens": 100,
+   "prompt_ms": 60.562,
+   "output_ms": 3378.029,
    "status": "awaiting_review",
-   "check": "pass",
-   "kept": 3,
-   "right": 3,
+   "check": "pass_with_cuts",
+   "kept": 1,
+   "right": 1,
    "cited_docs": [
-    [
-     "uae-golden-visa"
-    ],
-    [
-     "uae-golden-visa"
-    ],
     [
      "uae-golden-visa"
     ]
@@ -74,17 +71,20 @@
   {
    "id": "c41",
    "run": 3,
-   "seconds": 6.8,
+   "seconds": 8.0,
    "drafter": "LLMDrafter",
    "prompt_tokens": 4,
-   "output_tokens": 91,
-   "prompt_ms": 134.084,
-   "output_ms": 6457.724,
+   "output_tokens": 231,
+   "prompt_ms": 49.109,
+   "output_ms": 7796.137,
    "status": "awaiting_review",
    "check": "pass",
-   "kept": 3,
-   "right": 3,
+   "kept": 4,
+   "right": 4,
    "cited_docs": [
+    [
+     "uae-golden-visa"
+    ],
     [
      "uae-golden-visa"
     ],
@@ -101,17 +101,41 @@
   {
    "id": "c41",
    "run": 4,
-   "seconds": 11.2,
+   "seconds": 3.6,
    "drafter": "LLMDrafter",
    "prompt_tokens": 4,
-   "output_tokens": 153,
-   "prompt_ms": 130.019,
-   "output_ms": 10898.45,
+   "output_tokens": 100,
+   "prompt_ms": 50.596,
+   "output_ms": 3393.891,
+   "status": "awaiting_review",
+   "check": "pass_with_cuts",
+   "kept": 1,
+   "right": 1,
+   "cited_docs": [
+    [
+     "uae-golden-visa"
+    ]
+   ],
+   "found": true,
+   "clean": true
+  },
+  {
+   "id": "c41",
+   "run": 5,
+   "seconds": 9.5,
+   "drafter": "LLMDrafter",
+   "prompt_tokens": 4,
+   "output_tokens": 274,
+   "prompt_ms": 51.203,
+   "output_ms": 9363.739,
    "status": "awaiting_review",
    "check": "pass",
-   "kept": 3,
-   "right": 3,
+   "kept": 4,
+   "right": 4,
    "cited_docs": [
+    [
+     "uae-golden-visa"
+    ],
     [
      "uae-golden-visa"
     ],
@@ -127,13 +151,64 @@
   },
   {
    "id": "c41",
-   "run": 5,
-   "seconds": 7.8,
+   "run": 6,
+   "seconds": 3.6,
    "drafter": "LLMDrafter",
    "prompt_tokens": 4,
-   "output_tokens": 107,
-   "prompt_ms": 127.534,
-   "output_ms": 7521.555,
+   "output_tokens": 100,
+   "prompt_ms": 49.622,
+   "output_ms": 3462.339,
+   "status": "awaiting_review",
+   "check": "pass_with_cuts",
+   "kept": 1,
+   "right": 1,
+   "cited_docs": [
+    [
+     "uae-golden-visa"
+    ]
+   ],
+   "found": true,
+   "clean": true
+  },
+  {
+   "id": "c41",
+   "run": 7,
+   "seconds": 8.1,
+   "drafter": "LLMDrafter",
+   "prompt_tokens": 4,
+   "output_tokens": 231,
+   "prompt_ms": 49.025,
+   "output_ms": 7877.922,
+   "status": "awaiting_review",
+   "check": "pass",
+   "kept": 4,
+   "right": 4,
+   "cited_docs": [
+    [
+     "uae-golden-visa"
+    ],
+    [
+     "uae-golden-visa"
+    ],
+    [
+     "uae-golden-visa"
+    ],
+    [
+     "uae-golden-visa"
+    ]
+   ],
+   "found": true,
+   "clean": true
+  },
+  {
+   "id": "c41",
+   "run": 8,
+   "seconds": 3.4,
+   "drafter": "LLMDrafter",
+   "prompt_tokens": 4,
+   "output_tokens": 96,
+   "prompt_ms": 51.632,
+   "output_ms": 3220.186,
    "status": "awaiting_review",
    "check": "pass",
    "kept": 2,
@@ -151,105 +226,18 @@
   },
   {
    "id": "c41",
-   "run": 6,
-   "seconds": 6.7,
-   "drafter": "LLMDrafter",
-   "prompt_tokens": 4,
-   "output_tokens": 91,
-   "prompt_ms": 131.014,
-   "output_ms": 6365.621,
-   "status": "awaiting_review",
-   "check": "pass",
-   "kept": 3,
-   "right": 3,
-   "cited_docs": [
-    [
-     "uae-golden-visa"
-    ],
-    [
-     "uae-golden-visa"
-    ],
-    [
-     "uae-golden-visa"
-    ]
-   ],
-   "found": true,
-   "clean": true
-  },
-  {
-   "id": "c41",
-   "run": 7,
-   "seconds": 6.7,
-   "drafter": "LLMDrafter",
-   "prompt_tokens": 4,
-   "output_tokens": 91,
-   "prompt_ms": 128.931,
-   "output_ms": 6397.241,
-   "status": "awaiting_review",
-   "check": "pass",
-   "kept": 3,
-   "right": 3,
-   "cited_docs": [
-    [
-     "uae-golden-visa"
-    ],
-    [
-     "uae-golden-visa"
-    ],
-    [
-     "uae-golden-visa"
-    ]
-   ],
-   "found": true,
-   "clean": true
-  },
-  {
-   "id": "c41",
-   "run": 8,
-   "seconds": 7.0,
-   "drafter": "LLMDrafter",
-   "prompt_tokens": 4,
-   "output_tokens": 91,
-   "prompt_ms": 90.977,
-   "output_ms": 6610.725,
-   "status": "awaiting_review",
-   "check": "pass",
-   "kept": 3,
-   "right": 3,
-   "cited_docs": [
-    [
-     "uae-golden-visa"
-    ],
-    [
-     "uae-golden-visa"
-    ],
-    [
-     "uae-golden-visa"
-    ]
-   ],
-   "found": true,
-   "clean": true
-  },
-  {
-   "id": "c41",
    "run": 9,
-   "seconds": 6.7,
+   "seconds": 3.5,
    "drafter": "LLMDrafter",
    "prompt_tokens": 4,
-   "output_tokens": 91,
-   "prompt_ms": 136.835,
-   "output_ms": 6397.407,
+   "output_tokens": 100,
+   "prompt_ms": 51.277,
+   "output_ms": 3366.943,
    "status": "awaiting_review",
-   "check": "pass",
-   "kept": 3,
-   "right": 3,
+   "check": "pass_with_cuts",
+   "kept": 1,
+   "right": 1,
    "cited_docs": [
-    [
-     "uae-golden-visa"
-    ],
-    [
-     "uae-golden-visa"
-    ],
     [
      "uae-golden-visa"
     ]
@@ -260,14 +248,14 @@
   {
    "id": "c41",
    "run": 10,
-   "seconds": 4.3,
+   "seconds": 3.5,
    "drafter": "LLMDrafter",
    "prompt_tokens": 4,
-   "output_tokens": 57,
-   "prompt_ms": 123.957,
-   "output_ms": 4044.376,
+   "output_tokens": 100,
+   "prompt_ms": 49.788,
+   "output_ms": 3377.308,
    "status": "awaiting_review",
-   "check": "pass",
+   "check": "pass_with_cuts",
    "kept": 1,
    "right": 1,
    "cited_docs": [

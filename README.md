@@ -123,9 +123,12 @@ On the laptop below, with Nemotron 3 Nano 4B drafting, against the code shown in
 |---|---|---|
 | Data-protection question cites Article 2(2), the exclusion, 10 runs | 1 | 10, in English and in Arabic |
 | ITU scenarios, English | 10 of 10 | 10 of 10, twice |
-| ITU scenarios, Arabic, 5 runs | not measured | 8 to 9 of 10 per run |
-| Kept claims citing an expected document, 41 questions | 113 of 117 (0.966), 40 questions | 114 of 116 (0.983) |
-| "Can a Golden Visa holder sponsor their parents?", answers drawing only on the Golden Visa page, 10 runs | 0 | 9; the tenth adds a true side sentence |
+| ITU scenarios, Arabic, 5 runs | not measured | 5 of 5 on every step |
+| Kept claims citing an expected document, 41 questions | 113 of 117 (0.966), 40 questions | 119 of 121 (0.983) |
+| "Can a Golden Visa holder sponsor their parents?", answers drawing only on the Golden Visa page, 10 runs | 0 | 10 |
+| Numbers questions answered from the local open data, 70 runs | not available | 70 |
+| UK knowledge base scenarios, 30 runs | not available | 30 |
+| Median seconds per sourced answer on a quiet laptop | 10.2 | 10.2 |
 
 ```bash
 uv run python scripts/eval_citations.py                     # the 41 questions
@@ -168,7 +171,7 @@ uv run python scripts/selftest_verify.py                            # the checke
 
 ## What it does not do
 
-A 4B model writes the drafts, so it sometimes picks a true sentence that does not answer the question; the checker cannot judge relevance, and the reviewer does. Most service pages exist only in English, so an Arabic answer usually renders an English source, and the checker compares those by meaning with the embedding model: it kept no wrong claim on 25 labelled pairs, but it also cuts some correct Arabic claims, which is why scenario S7 passes 2 times of 5 in Arabic. Sourced answers take 8 to 15 seconds on this laptop. Dalil keeps no conversation state: a follow-up restates the whole question.
+A 4B model writes the drafts, so it sometimes keeps a true sentence that does not answer the question; the checker cannot judge relevance, and the reviewer does. Most service pages exist only in English, so an Arabic answer usually renders an English source; the checker compares the Arabic with the writer's English version of it, which catches a changed number, negation, unit or meaning, but not every shade of a mistranslation. Sourced answers take about 10 seconds on this laptop, almost all of it the model writing. Dalil keeps no conversation state: a follow-up restates the whole question.
 
 ## Built with
 
