@@ -70,6 +70,9 @@ FIXED_UNCITED = lang.all_fixed({
 # question about a law's reach needs, and how many scope passages are added.
 SCOPE_FROM = 8
 SCOPE_ADD = 3
+# How high a named subject's own page must rank for the search to keep to it.
+SUBJECT_RANK = 3
+_PLACEHOLDER = re.compile(r"\[[A-Z][A-Z ]+\]")
 # Past reviews whose questions are translated for matching, per request, and
 # how many translations are kept across requests.
 MEMORY_TRANSLATIONS = 5
@@ -292,11 +295,17 @@ class Pipeline:
         the law's own answer and its wording is often too far from the
         question's to rank high.
         """
-        hits = self.retriever.search(question, self.k + len(avoid))
+        # A redaction placeholder such as "[NATIONAL INSURANCE]" is not what
+        # the question is about, so it is not searched for.
+        query, english_query = _PLACEHOLDER.sub(" ", question), _PLACEHOLDER.sub(" ", english)
+        # Twice as deep as needed, so that keeping to a named subject below
+        # still leaves k passages.
+        depth = 2 * self.k + len(avoid)
+        hits = self.retriever.search(query, depth)
         if english:
-            hits = fuse(self.retriever.search(english, self.k + len(avoid)), hits)
-        hits = [h for h in hits if h.passage_id not in avoid][: self.k]
-        hits = self.on_subject(english or question, hits)
+            hits = fuse(self.retriever.search(english_query, depth), hits)
+        hits = [h for h in hits if h.passage_id not in avoid]
+        hits = self.on_subject(english or question, hits)[: self.k]
         if not is_scope_question(question) or not self.laws:
             return hits
         law_docs = list(dict.fromkeys(h.doc_id for h in hits[:SCOPE_FROM] if h.doc_id in self.laws))
@@ -325,7 +334,9 @@ class Pipeline:
         read close to the question and do not apply to it."""
         titles, laws = getattr(self, "titles", {}), getattr(self, "laws", {})
         subjects = subject_docs(question, titles)
-        if not subjects or not any(h.doc_id in subjects for h in hits):
+        # The subject's own page must rank near the top: a page that matches
+        # only further down is not what the question is about.
+        if not subjects or not any(h.doc_id in subjects for h in hits[:SUBJECT_RANK]):
             return hits
         names = [titles[d].split("|")[0] for d in subjects]
         # What the question asks about the subject: its words, less the
@@ -462,6 +473,11 @@ class Pipeline:
                                                     "cut_first": [s["reasons"] for s in check["sentences"]
                                                                   if not s["kept"]]})
                 draft, check = redraft, second
+        # The checked sentences follow the draft's order; carry the mark of a
+        # sentence Dalil's data rule stated, so the screen can show it.
+        for checked, drafted in zip(check["sentences"], draft):
+            if drafted.get("restated"):
+                checked["restated"] = True
         kept = sum(s["kept"] for s in check["sentences"])
         self.store.event(qid, "verified", {"status": check["status"], "kept": kept,
                                            "cut": len(check["sentences"]) - kept,

@@ -39,10 +39,8 @@ from dalil.verify import MIN_QUOTE_WORDS
 # the drafter refuses. Picked on eval/questions.jsonl: answerable questions
 # score 11 or more, off-topic probes ("capital of France") under 9.
 WEAK_SCORE = 10.0
-# The same gate for a question in a language most sources are not written in,
-# where BM25 cannot match words: the best dense similarity to the question.
-# Measured on the Arabic versions of the ITU scenarios and off-topic Arabic
-# probes; see docs/evaluation.md.
+# Or the best dense similarity to the question. Off-topic questions scored at
+# most 0.20 on the UAE and UK bases, on-topic ones at least 0.44.
 WEAK_DENSE = 0.40
 # A translation is one short call; past this, search goes on without it.
 TRANSLATE_TIMEOUT = 20.0
@@ -244,18 +242,20 @@ def _usable(sentence: str) -> bool:
 
 
 def weak(question: str, hits: Sequence[Hit], weak_score: float = WEAK_SCORE) -> bool:
-    """Whether retrieval is too weak to answer from.
+    """Whether retrieval is too weak to answer from: neither the best keyword
+    score nor the best dense similarity is high enough.
 
-    BM25 matches words, so for a question in English it is the test, as it
-    always was. For an Arabic question over mostly English sources BM25 can
-    only match the few Arabic documents, so the best dense similarity counts
-    too, and either one strong enough is enough.
+    Keyword scores depend on the knowledge base's size: on the UK base, 92
+    passages, every on-topic question scored under 10 and was refused. Dense
+    similarity does not: off-topic questions scored at most 0.20 on both
+    bases and on-topic ones at least 0.44 (docs/evaluation.md). With no
+    embedding model the dense score is 0 and keywords decide, as before.
     """
     if not hits:
         return True
     if max(h.score for h in hits) >= weak_score:
         return False
-    return lang.language(question) == lang.ENGLISH or max(h.dense for h in hits) < WEAK_DENSE
+    return max(h.dense for h in hits) < WEAK_DENSE
 
 
 def _is_scope(h: Hit) -> bool:
@@ -403,12 +403,16 @@ class ExtractiveDrafter:
         return [(h, s) for h, _, s in chosen]
 
     def draft(self, question: str, hits: list[Hit], data: list[DataResult],
-              notes: Sequence[str] = ()) -> list[dict[str, Any]]:
+              notes: Sequence[str] = (), **_: Any) -> list[dict[str, Any]]:
+        # A numbers question can be answered by its lookup alone, which is
+        # what matters when the model is down: state the fact with its data
+        # citation rather than refuse.
+        facts = data_claims(data)
         if weak(question, hits, self.weak_score):
-            return [refusal()]
+            return facts or [refusal()]
         picked = self.pick(question, hits)
         if not picked:
-            return [refusal()]
+            return facts or [refusal()]
         out: list[dict[str, Any]] = [
             {"text": sent, "kind": "claim", "citations": [{"passage_id": hit.passage_id, "quote": sent}]}
             for hit, sent in picked

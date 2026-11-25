@@ -253,6 +253,60 @@ def _negations(words: set[str]) -> set[str]:
     return found
 
 
+# Units that must agree with the source, in English and Arabic. Matched on
+# text with Arabic marks and alef forms normalised.
+_CURRENCIES = {
+    "AED": r"\baed\b|\bdhs?\b|\bdirhams?\b|درهم\w*|دراهم|د\.ا",
+    "SAR": r"\bsar\b|\briyals?\b|ريال\w*",
+    "USD": r"\busd\b|\bdollars?\b|\$|دولار\w*",
+    "EUR": r"\beur\b|\beuros?\b|€|يورو",
+    "GBP": r"\bgbp\b|\bpounds?\b|£|جنيه\w*",
+}
+_TIME_UNITS = {
+    "hour": r"hours?|ساعه|ساعات|ساعتين",
+    "day": r"days?|يوم\w*|ايام",
+    "week": r"weeks?|اسبوع\w*|اسابيع",
+    "month": r"months?|شهر\w*|اشهر",
+    "year": r"years?|سنه|سنوات|سنين|عام|اعوام",
+}
+_TIME_AFTER_NUMBER = re.compile(
+    r"(\d[\d,]*(?:\.\d+)?)\s*(?:-\s*)?(?:working\s+|calendar\s+|full\s+|consecutive\s+)?("
+    + "|".join(f"(?P<{k}>{v})" for k, v in _TIME_UNITS.items()) + r")(?![a-z])", re.IGNORECASE)
+
+
+def _unit_text(text: str) -> str:
+    from dalil.retrieve import normalise_arabic
+    return normalise_arabic(unicodedata.normalize("NFKC", text).casefold()).translate(_ARABIC_DIGITS)
+
+
+def currencies(text: str) -> set[str]:
+    """Currencies a text names: "AED 20" and "20 درهماً" are both AED."""
+    plain = _unit_text(text)
+    return {c for c, pattern in _CURRENCIES.items() if re.search(pattern, plain)}
+
+
+def timed_numbers(text: str) -> dict[str, set[str]]:
+    """Number -> the time units written right after it: "30 days" -> {"30": {"day"}}."""
+    out: dict[str, set[str]] = {}
+    for m in _TIME_AFTER_NUMBER.finditer(_unit_text(text)):
+        unit = next(k for k in _TIME_UNITS if m.group(k))
+        out.setdefault(m.group(1).replace(",", ""), set()).add(unit)
+    return out
+
+
+def unit_mismatches(claim: str, evidence: str) -> list[str]:
+    """Units the claim gives that its evidence does not: a currency its sources
+    never name ("20 ريالاً" over "AED 20"), or a number with another time unit
+    than the sources give it ("14 weeks" over "14 days")."""
+    problems = [f"names {c}, which its sources do not" for c in sorted(currencies(claim) - currencies(evidence))]
+    have = timed_numbers(evidence)
+    for n, units in timed_numbers(claim).items():
+        if have.get(n) and not units & have[n]:
+            problems.append(f"gives {n} in {'/'.join(sorted(units))}s where its sources give "
+                            f"{'/'.join(sorted(have[n]))}s")
+    return problems
+
+
 def _script(text: str) -> str:
     """"ar" or "en": which script most of the letters in `text` are in."""
     from dalil.lang import language
@@ -498,6 +552,11 @@ class Verifier:
             if missing:
                 result.kept = False
                 result.reasons.append("numbers not in any cited source: " + ", ".join(missing))
+        if result.kept:
+            units = unit_mismatches(text, " ".join(f"{c.evidence} {c.title}" for c in result.citations))
+            if units:
+                result.kept = False
+                result.reasons.append("units do not match its sources: " + "; ".join(units))
         if result.kept:
             # Values cited from one query must come from one row: "4242 in 2025"
             # cannot pair 2025 from one row with 4242 from another.

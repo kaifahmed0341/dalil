@@ -64,9 +64,9 @@ RULES: tuple[DataRule, ...] = (
         "dalil.open_icp_transactions",
         "SELECT year, transactions FROM dalil.open_icp_transactions "
         "WHERE service_en = 'Renewal of ID Card' ORDER BY year DESC LIMIT 1",
-        "ICP open data counts {transactions} Emirates ID card renewals in {year}.",
-        "تسجل البيانات المفتوحة للهيئة الاتحادية للهوية والجنسية {transactions} عملية تجديد لبطاقة الهوية "
-        "الإماراتية في عام {year}.",
+        "In {year}, ICP renewed {transactions} Emirates ID cards, according to its open data.",
+        "جددت الهيئة الاتحادية للهوية والجنسية {transactions} بطاقة هوية إماراتية في عام {year}، "
+        "بحسب بياناتها المفتوحة.",
         "The number of Emirates ID cards the Federal Authority for Identity and Citizenship (ICP) renews in a "
         "year. عدد بطاقات الهوية الإماراتية التي تجددها الهيئة الاتحادية للهوية والجنسية في السنة، أي عدد "
         "عمليات تجديد الهوية.",
@@ -76,9 +76,8 @@ RULES: tuple[DataRule, ...] = (
         "dalil.open_icp_transactions",
         "SELECT year, transactions FROM dalil.open_icp_transactions "
         "WHERE service_en = 'Renewal of Residence Permits' ORDER BY year DESC LIMIT 1",
-        "ICP open data counts {transactions} residence permit renewals in {year}.",
-        "تسجل البيانات المفتوحة للهيئة الاتحادية للهوية والجنسية {transactions} عملية تجديد لتصاريح الإقامة "
-        "في عام {year}.",
+        "In {year}, ICP renewed {transactions} residence permits, according to its open data.",
+        "جددت الهيئة الاتحادية للهوية والجنسية {transactions} تصريح إقامة في عام {year}، بحسب بياناتها المفتوحة.",
         "The number of residence permits (residence visas) ICP renews in a year. عدد تصاريح الإقامة وتأشيرات "
         "الإقامة التي تجددها الهيئة الاتحادية للهوية والجنسية في السنة.",
     ),
@@ -86,8 +85,9 @@ RULES: tuple[DataRule, ...] = (
         "tasheel_centres", re.compile(r"\btasheel\b|تسهيل", re.I),
         "dalil.open_tasheel_centres",
         "SELECT COUNT(*) AS centres, COUNT(DISTINCT emirate_en) AS emirates FROM dalil.open_tasheel_centres",
-        "MOHRE open data lists {centres} Tasheel service centres across {emirates} emirates.",
-        "تُدرج البيانات المفتوحة لوزارة الموارد البشرية والتوطين {centres} مركز خدمة تسهيل في {emirates} إمارات.",
+        "There are {centres} Tasheel service centres across {emirates} emirates, according to MOHRE's open data.",
+        "يوجد {centres} مركز خدمة تسهيل في {emirates} إمارات، بحسب البيانات المفتوحة لوزارة الموارد البشرية "
+        "والتوطين.",
         "The number of Tasheel service centres of the Ministry of Human Resources and Emiratisation (MOHRE) in "
         "the UAE, and the number of emirates they are spread across. عدد مراكز خدمة تسهيل التابعة لوزارة "
         "الموارد البشرية والتوطين في دولة الإمارات، والمراكز موزعة على عدد من الإمارات.",
@@ -98,8 +98,9 @@ RULES: tuple[DataRule, ...] = (
         "dalil.open_ehs_medical_fitness",
         "SELECT year, CAST(SUM(CAST(total AS BIGINT)) AS BIGINT) AS exams "
         "FROM dalil.open_ehs_medical_fitness GROUP BY year ORDER BY year DESC LIMIT 1",
-        "Emirates Health Services open data counts {exams} residency medical fitness exams in {year}.",
-        "تسجل البيانات المفتوحة لمؤسسة الإمارات للخدمات الصحية {exams} فحص لياقة طبية للإقامة في عام {year}.",
+        "In {year}, Emirates Health Services carried out {exams} medical fitness exams for residency, according "
+        "to its open data.",
+        "أجرت مؤسسة الإمارات للخدمات الصحية {exams} فحص لياقة طبية للإقامة في عام {year}، بحسب بياناتها المفتوحة.",
         "The number of medical fitness exams for residency visas that Emirates Health Services carries out in a "
         "year. عدد فحوصات اللياقة الطبية لتأشيرات الإقامة التي تجريها مؤسسة الإمارات للخدمات الصحية في السنة.",
     ),
@@ -114,10 +115,10 @@ RULES: tuple[DataRule, ...] = (
         "FROM dalil.open_mohre_solved_complaints "
         "WHERE City_En IN ('Abu Dhabi', 'Dubai', 'Sharjah', 'Ajman', 'Om-El-Quain', 'Ras El-Khaema', 'Fujiarah') "
         "AND Year <= 2019 GROUP BY Year ORDER BY Year DESC LIMIT 1",
-        "MOHRE open data records {solved} solved private-sector labour complaints in {year}, "
-        "counting each emirate once.",
-        "تسجل البيانات المفتوحة لوزارة الموارد البشرية والتوطين {solved} شكوى عمالية محلولة في القطاع الخاص "
-        "في عام {year}، مع احتساب كل إمارة دون تكرار.",
+        "In {year}, MOHRE solved {solved} private-sector labour complaints, counting each emirate once, "
+        "according to its open data.",
+        "حلت وزارة الموارد البشرية والتوطين {solved} شكوى عمالية في القطاع الخاص في عام {year}، مع احتساب كل "
+        "إمارة دون تكرار، بحسب بياناتها المفتوحة.",
         "The number of private-sector labour complaints that MOHRE solves in a year. عدد الشكاوى العمالية في "
         "القطاع الخاص التي تحلها وزارة الموارد البشرية والتوطين في السنة.",
     ),

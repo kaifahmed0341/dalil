@@ -282,10 +282,11 @@ def test_arabic_screens():
     assert FEE_CAVEAT in lang.ARABIC_FIXED
 
 
-def test_weak_gate_uses_dense_similarity_only_for_arabic():
+def test_weak_gate_needs_both_scores_low():
     low = [as_hit(PORTAL, score=2.0, dense=0.6)]
-    assert weak("How do I see my records?", low)
+    assert not weak("How do I see my records?", low)  # a small base: low keyword score, strong meaning match
     assert not weak("كيف أطلع على سجلاتي؟", low)
+    assert weak("What is the capital of France?", [as_hit(PORTAL, score=8.0, dense=0.2)])
     assert weak("كيف أطلع على سجلاتي؟", [as_hit(PORTAL, score=2.0, dense=0.1)])
     assert weak("anything", [])
 
@@ -744,3 +745,68 @@ def test_naming_the_cited_law_by_its_title_is_supported():
                      "public records or public bodies which keep or use Personal Records.",
              "citations": [cite(FED_SCOPE, FED_QUOTE)]}
     assert v.check_sentence(claim).kept
+
+
+def test_fallback_writer_states_a_lookup_fact_when_retrieval_is_weak():
+    from dalil.draft import ExtractiveDrafter
+    from dalil.opendata import DataResult
+    data = [DataResult("dalil.open_sample", "SELECT n FROM dalil.open_sample", [{"n": "49"}],
+                       fact="There are {n} sample centres, according to its open data.")]
+    out = ExtractiveDrafter().draft("How many sample centres are there?", [as_hit(PORTAL, 1.0)], data)
+    assert [s["text"] for s in out] == ["There are 49 sample centres, according to its open data."]
+    assert out[0]["citations"][0]["column"] == "n"
+    assert ExtractiveDrafter().draft("How many sample centres are there?", [as_hit(PORTAL, 1.0)], [])[0]["kind"] == "refusal"
+
+
+# --- units and currency ----------------------------------------------------------------
+
+
+def _fee_verifier():
+    p = passage("sample-fee:p1:1", "A late fee of AED 20 per day is charged, up to AED 1,000, within 30 days.", kind="html")
+    return p, Verifier({p["passage_id"]: p}, similarity=lambda c, w: [0.9 for _ in w])
+
+
+@pytest.mark.parametrize("text, kept", [
+    ("تُفرض غرامة تأخير قدرها 20 درهماً عن كل يوم، بحد أقصى 1,000 درهم.", True),
+    ("تُفرض غرامة تأخير قدرها 20 ريالاً عن كل يوم، بحد أقصى 1,000 ريال.", False),
+    ("A late fee of 20 dollars per day is charged.", False),
+    ("A late fee of AED 20 per day is charged, up to AED 1,000.", True),
+    ("The fee must be paid within 30 weeks.", False),
+    ("The fee must be paid within 30 days.", True),
+])
+def test_units_and_currency_must_match_the_source(text, kept):
+    p, v = _fee_verifier()
+    check = v.check_sentence({"text": text, "citations": [{"passage_id": p["passage_id"], "quote": p["text"]}]})
+    assert check.kept is kept, check.reasons
+    if not kept:
+        assert any("units do not match" in r for r in check.reasons)
+
+
+@pytest.mark.parametrize("question, subject", [
+    ("Is my card still valid? My Gold card is [GOLD CARD].", False),
+    ("My Gold card number is GC1234. How much leave do I get?", False),
+    ("What do I need to renew my Gold card?", True),
+    ("How long can I stay after my Gold card is cancelled?", True),
+    ("Can a Gold card holder sponsor their parents?", True),
+])
+def test_a_title_named_only_to_share_a_detail_is_not_the_subject(question, subject):
+    from dalil.subjects import subject_docs
+    assert bool(subject_docs(question, {"sample-gold-card": "Gold card"})) is subject
+
+
+def test_redaction_placeholders_are_not_searched(tmp_path):
+    retriever = FakeRetriever([as_hit(PORTAL)])
+    p = Pipeline(Store(tmp_path / "d.db"), retriever, PASSAGES, zetaris_factory=None)
+    p.search("My Gold card is [GOLD CARD]. How do I see my records?", set())
+    assert "[GOLD CARD]" not in retriever.queries[0] and "records" in retriever.queries[0]
+
+
+def test_a_restated_data_sentence_is_marked_in_the_check(tmp_path):
+    class Restating:
+        def draft(self, question, hits, data, notes=(), english=""):
+            return [{"text": PORTAL_QUOTE, "kind": "claim", "citations": [cite(PORTAL, PORTAL_QUOTE)], "restated": True}]
+
+    p = Pipeline(Store(tmp_path / "d.db"), FakeRetriever([as_hit(PORTAL, 20.0)]), PASSAGES, drafter=Restating(),
+                 zetaris_factory=None)
+    rec = p.answer("Can I see the personal records kept about me?")
+    assert rec.check["sentences"][0].get("restated") is True

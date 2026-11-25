@@ -323,9 +323,11 @@
       }
       case "verified": {
         const cut = ((r.check && r.check.sentences) || []).filter((s) => !s.kept);
-        const text = str || (d.status === "held"
+        const restated = Number(d.data_restated) || 0;
+        const text = (str || (d.status === "held"
           ? "Kept " + (Number(d.kept) || 0) + ", cut " + (Number(d.cut) || 0) + ". Too much was cut to send, so the answer is held."
-          : "Tested every quote and number. Kept " + (Number(d.kept) || 0) + ", cut " + (Number(d.cut) || 0) + ".");
+          : "Tested every quote and number. Kept " + (Number(d.kept) || 0) + ", cut " + (Number(d.cut) || 0) + "."))
+          + (restated ? " Dalil wrote " + plural(restated, "sentence") + " from its open-data rule, because the model did not state the value; the query was rerun like any other." : "");
         return { part: "Checker", node: "P", text, cut };
       }
       case "queued":
@@ -799,6 +801,10 @@
       if (!para) { para = h("p", { class: "answer-para", dir: paraDir(s.text) }); box.append(para); }
       const bad = (s.citations || []).some((c) => c.ok === false);
       add(para, sentenceEl(s.text, s._nums, "sentence" + (bad ? " sentence-warn" : "")), " ");
+      if (s.restated) {
+        add(para, h("span", { class: "restated-tag", title: "The model did not state this value, so Dalil wrote it from its open-data rule. The checker reran the query." },
+          "Written by Dalil from the open data"), " ");
+      }
     }
   }
 

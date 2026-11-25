@@ -14,6 +14,7 @@ behaviour from its own titles.
 
 from __future__ import annotations
 
+import re
 from collections.abc import Iterable, Mapping
 
 from dalil.retrieve import tokenize
@@ -39,7 +40,29 @@ def subject_docs(question: str, titles: Mapping[str, str], skip: Iterable[str] =
     words = set(tokenize(question))
     skipped = set(skip)
     return {d for d, t in titles.items() if d not in skipped
-            for terms in [title_terms(t)] if len(terms) >= 2 and terms <= words}
+            for terms in [title_terms(t)] if len(terms) >= 2 and terms <= words and not _in_passing(question, t)}
+
+
+_POSSESSIVE = r"(?:my|your|his|her|our|their)"
+
+
+def _in_passing(question: str, title: str) -> bool:
+    """Whether the title is named only to share a personal detail: "My
+    Emirates ID is [EMIRATES ID]", "My National Insurance number is QQ...".
+    The question is then about something else. "Renew my Emirates ID" and
+    "my residence visa is cancelled" are about the title, so they count."""
+    head = [w for w in re.findall(r"[A-Za-z]+", title.split("|")[0]) if tokenize(w) and not
+            set(tokenize(w)) & _TITLE_FILLER]
+    if not head:
+        return False
+    phrase = r"\W+(?:\w+\W+){0,2}?".join(re.escape(w) for w in head[-2:])
+    found = [m for m in re.finditer(phrase, question, re.IGNORECASE)
+             if not re.search(r"\[[^\]]*$", question[:m.start()])]  # not inside a "[PLACEHOLDER]"
+    sharing = rf"\s+(?:number\s+|no\.?\s+)?(?:is|:)\s*(?:\[[A-Z ]+\]|[A-Z0-9])"
+    return bool(found) and all(
+        re.search(rf"\b{_POSSESSIVE}\s+(?:\w+\s+){{0,2}}$", question[:m.start()], re.IGNORECASE)
+        and re.match(sharing, question[m.end():])
+        for m in found)
 
 
 def names_subject(text: str, subject_titles: Iterable[str]) -> bool:

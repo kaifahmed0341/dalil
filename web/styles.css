@@ -445,3 +445,7 @@ a:hover { color: #063d3e; }
   .review-fields { grid-template-columns: minmax(140px, 12rem) minmax(0, 1fr); margin-bottom: 6px; }
 }
 .hit-added { font-size: 0.875rem; font-weight: 650; color: var(--working-fg); }
+
+/* A sentence Dalil's open-data rule wrote, not the model. */
+.restated-tag { display: inline-block; margin-inline-start: 4px; padding: 0 6px; border: 1px solid var(--muted);
+  border-radius: 4px; font-size: 0.75rem; color: var(--muted); vertical-align: middle; }

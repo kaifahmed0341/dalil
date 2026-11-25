@@ -211,7 +211,7 @@ def test_pipeline_answers_from_the_local_database_and_the_checker_reruns_it(tmp_
     rec = p.answer("How early can I renew my Emirates ID card?")
     data = [s for s in rec.check["sentences"] if any("sql" in c for c in s["citations"])]
     assert len(data) == 1 and data[0]["kept"]
-    assert data[0]["text"] == "ICP open data counts 5856085 Emirates ID card renewals in 2025."
+    assert data[0]["text"] == "In 2025, ICP renewed 5856085 Emirates ID cards, according to its open data."
     assert all(c["ok"] and c["reason"] == "value returned by the query" for c in data[0]["citations"])
     assert rec.data[0]["source"] == "local"
     looked = next(e for e in p.store.get(rec.id)["audit"] if e["kind"] == "data_looked_up")
@@ -324,7 +324,7 @@ def test_a_cut_attempt_at_the_data_is_restated_with_the_rule_sentence(tmp_path, 
     rec = p.answer("How many labour complaints does MOHRE solve? I want to renew my card.")
     texts = {s["text"]: s["kept"] for s in rec.check["sentences"]}
     assert texts["Ask anyone and they will tell you 207927 is a big figure."] is False
-    fact = "MOHRE open data records 207927 solved private-sector labour complaints in 2019, counting each emirate once."
+    fact = "In 2019, MOHRE solved 207927 private-sector labour complaints, counting each emirate once, according to its open data."
     assert texts[fact] is True
     verified = next(e for e in p.store.get(rec.id)["audit"] if e["kind"] == "verified")
     assert verified["detail"]["data_restated"] == 1
@@ -401,7 +401,7 @@ def test_a_data_citation_on_a_sentence_that_does_not_state_it_is_dropped_and_the
     first = rec.check["sentences"][0]
     assert first["kept"] and not any(c.get("sql") for c in first["citations"])
     kept = [s["text"] for s in rec.check["sentences"] if s["kept"]]
-    assert "ICP open data counts 5856085 Emirates ID card renewals in 2025." in kept
+    assert "In 2025, ICP renewed 5856085 Emirates ID cards, according to its open data." in kept
 
 
 def test_a_claim_stating_a_lookup_value_gets_its_data_citation(tmp_path, local):
@@ -490,7 +490,7 @@ def test_an_english_fact_from_the_fallback_is_said_in_arabic(tmp_path, local):
     p = scripted(tmp_path, local, data_claims(data))  # what the extractive drafter writes: the English fact
     rec = p.answer(q)
     kept = [s["text"] for s in rec.check["sentences"] if s["kept"]]
-    assert kept and all("5856085" in t and "الهوية" in t for t in kept if any(ch.isdigit() for ch in t)), kept
+    assert kept and all("5856085" in t and "هوية" in t for t in kept if any(ch.isdigit() for ch in t)), kept
 
 
 def test_a_data_backed_claim_is_not_treated_as_stitched_from_documents(local):
@@ -553,7 +553,7 @@ def test_a_count_question_gets_the_number_even_if_the_model_leaves_it_out(tmp_pa
          "kind": "claim", "citations": [QUOTE]}])
     rec = p.answer("How many Emirates ID cards does ICP renew in a year?")
     kept = [s["text"] for s in rec.check["sentences"] if s["kept"]]
-    assert "ICP open data counts 5856085 Emirates ID card renewals in 2025." in kept
+    assert "In 2025, ICP renewed 5856085 Emirates ID cards, according to its open data." in kept
 
 
 def test_a_question_that_does_not_ask_a_count_is_left_alone(tmp_path, local):
