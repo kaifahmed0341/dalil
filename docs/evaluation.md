@@ -2,30 +2,33 @@
 
 ## The ITU final version, 25 November 2026
 
-Measured on an Apple M3 Pro laptop with 18 GB of memory, both models on its GPU through Metal, fully offline, open data on the local database. "Main" is commit `49e8e0e`, the code in the 25 November video, on its own 1,024 passages; "final" is this branch at `dfc704f` (the 41 questions, the scenarios and the open data) and `59bd4f9` (the rest; the one change between them gates open-data lookups, which none of those questions trigger), on 1,030 passages, except the seven ITU scenarios, rerun at `20f484a` after an orchestrator check found Arabic S3 failing at `6071285`. NVIDIA Nemotron 3 Nano 4B drafted every answer. The reports are in [itu/runs/](itu/runs/); they hold ids, statuses and document ids, no document text.
+Measured on an Apple M3 Pro laptop with 18 GB of memory, both models on its GPU through Metal, fully offline, open data on the local database. "Main" is commit `49e8e0e`, the code in the 25 November video, on its own 1,024 passages. "Final" is this branch at `29fd611`, on 1,030 passages: every number in that column was measured at that one commit on 26 November, except the two rows that name another commit. NVIDIA Nemotron 3 Nano 4B drafted every answer. The reports are in [itu/runs/](itu/runs/); they hold ids, statuses and document ids, no document text.
 
-| | Main | Final |
+| | Main | Final, `29fd611` |
 |---|---|---|
 | Data-protection question cites Article 2(2), 10 runs, English | 1 | 10 |
-| Same, Arabic, quoting the lead-in with the list | 0 (it quoted item (b) alone) | 10 |
-| A Dubai law sentence kept without saying it is the Dubai law, 10 runs | 10 | 0 |
+| Same, Arabic, «هل يطبق قانون حماية البيانات الشخصية على الجهات الحكومية؟» | 0 (it quoted item (b) alone) | 10 |
+| Same, Arabic, the video's «هل يشمل قانون حماية البيانات في الإمارات طريقة تعامل الجهات الحكومية مع بياناتي الشخصية؟» | not measured | 10 |
+| A Dubai law sentence kept without saying it is the Dubai law, 10 runs per wording | 10 | 0 |
 | Seven ITU scenarios, English | 10 of 10, twice | 10 of 10, twice |
 | Seven ITU scenarios, Arabic, 5 runs | not measured | 5 of 5 on every one of the ten steps |
 | S7 follow-up answered from other passages, 10 runs | English 10 | English 10, Arabic 10 |
-| Kept claims citing an expected document and saying nothing their sources do not | 113 of 117 (0.966), 40 questions | 126 of 126, 43 questions |
-| Answers with every kept claim right | 36 of 40 | 43 of 43 |
+| Kept claims citing an expected document and saying nothing their sources do not | 113 of 117 (0.966), 40 questions | 119 of 119, 43 questions |
+| Answers with every kept claim right | 36 of 40 | 42 of 43; c39 kept no claim |
 | "Can a Golden Visa holder sponsor their parents?", 10 runs: answers from the Golden Visa page that never claim parents | 0 | 10 |
-| c05 (retirement visa) and c10 (medical conditions), 10 runs each, clean | not measured | 20 of 20 |
-| Numbers questions on the local database, 7 questions, 10 runs each | not available | 70 of 70 |
+| Numbers questions on the local database, 7 questions, 10 runs each | not available | 67 of 70; D2 held 3 times |
 | UK knowledge base scenarios, 6, 5 runs each | not available | 30 of 30 |
-| Median seconds per sourced answer, quiet laptop | 10.2 | 10.2 |
+| c05 (retirement visa) and c10 (medical conditions), 10 runs each, clean | not measured | 20 of 20, at `355bd32`, not rerun |
+| Median seconds per sourced answer, quiet laptop | 10.2 | 10.2, an earlier quiet run, not rerun |
 
-The final column is commit `355bd32` for the scenarios, the 43 questions, the Golden Visa, c05 and c10 runs, and earlier commits of the same day for the rest, whose code paths did not change after them (the data-protection runs at `59bd4f9`, the open-data and UK runs at `dfc704f` and `59bd4f9`).
+Two numbers are worse than the ones written before. The open-data question D2 (residence permit renewals) was held in 3 runs of 10: the writer's passage claims were cut, one for a word of the question its sources do not have, and the answer was held for a person; it passed 70 of 70 at `59bd4f9`. And c39 kept no claim, where it kept claims at `355bd32`; its slow fallback is known and was left alone.
 
-Kept sentences per Arabic run at `355bd32`, out of those drafted (h: held for a person):
-- S2 step 1 (an Emirates ID in the question): 2/4, 0/4, 1/4h, 1/4h, 0/4. The ID is replaced and the Arabic warning goes out every time; the drafted sentences guess at the resident's own visa and are mostly cut.
-- S3 (renting in Dubai): 3/4, 3/4, 0/4, 2/4, 2/4. At `e93553c`, before the fixes below, 0 of 4 in 9 runs of 10, all held.
-- S7 step 2 (after a rejection): 3/4, 4/4, 3/4, 3/4, 3/4. At `e93553c`, held in 6 runs of 10.
+Kept sentences per Arabic run at `29fd611`, out of those drafted (h: held for a person):
+- S2 step 1 (an Emirates ID in the question): 1/4h, 0/1, 0/4, 0/1, 0/1. The ID is replaced and the Arabic warning goes out every time; the drafted sentences guess at the resident's own visa and are cut. At `355bd32`: 2/4, 0/4, 1/4h, 1/4h, 0/4.
+- S3 (renting in Dubai): 3/4, 0/4, 0/4, 3/4, 3/4. At `355bd32`: 3/4, 3/4, 0/4, 2/4, 2/4. At `e93553c`, before the rehearsal fixes, 0 of 4 in 9 runs of 10, all held.
+- S7 step 2 (after a rejection): 1/1, 3/4, 2/3, 3/4, 3/4. At `355bd32`: 3/4, 4/4, 3/4, 3/4, 3/4.
+
+The Arabic data-protection answer fell to 2 of 5 at `6d544ae`. `c8d99e1` had the writer name the law in its English version of each claim, and an Arabic claim quoting the Arabic Article 2(2) word for word while also citing the English Article 2 was then checked against that short English version (similarity 0.57, under 0.60) and cut. A claim that cites a passage in its own language is now checked word for word against it, as any same-language claim is; the 0.60 threshold is unchanged. A sentence the writer repeats, whatever its punctuation or citation, is now said once, in the extractive redraft too.
 
 ### What changed, and why
 

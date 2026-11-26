@@ -105,16 +105,11 @@
     "uae-employment-contracts:p1:4"
    ],
    "second_cited": [
-    "uae-terminating-employment-contracts:p1:4",
-    "uae-terminating-employment-contracts:p1:5",
-    "uae-terminating-employment-contracts:p1:6"
+    "uae-terminating-employment-contracts:p1:4"
    ],
    "second_status": "pass",
    "pass": true,
    "second_kinds": [
-    "claim",
-    "claim",
-    "claim",
     "claim"
    ]
   },

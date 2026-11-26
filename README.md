@@ -117,18 +117,18 @@ uv run python scripts/run_itu_scenarios.py --language ar    # Arabic
 
 ## Measured
 
-On the laptop below, with Nemotron 3 Nano 4B drafting, against the code shown in the 25 November video. Every number, with its runs, is in [docs/evaluation.md](docs/evaluation.md).
+On the laptop below, with Nemotron 3 Nano 4B drafting. Before is the code shown in the 25 November video (`49e8e0e`); now is `29fd611`, where every number but the last row was measured. Every number, with its runs, is in [docs/evaluation.md](docs/evaluation.md).
 
-| | Before | Now |
+| | Before | Now, `29fd611` |
 |---|---|---|
-| Data-protection question cites Article 2(2), the exclusion, 10 runs | 1 | 10, in English and in Arabic |
+| Data-protection question cites Article 2(2), the exclusion, 10 runs | 1 | 10 in English, 10 for each of two Arabic wordings |
 | ITU scenarios, English | 10 of 10 | 10 of 10, twice |
 | ITU scenarios, Arabic, 5 runs | not measured | 5 of 5 on every step |
-| Citation evaluation: kept claims citing an expected document and saying nothing their sources do not | 113 of 117 (0.966), 40 questions | 126 of 126, 43 questions |
+| Citation evaluation: kept claims citing an expected document and saying nothing their sources do not | 113 of 117 (0.966), 40 questions | 119 of 119, 43 questions; one question kept no claim |
 | "Can a Golden Visa holder sponsor their parents?", 10 runs: from the Golden Visa page, never claiming parents | 0 | 10 |
-| Numbers questions answered from the local open data, 70 runs | not available | 70 |
+| Numbers questions answered from the local open data, 70 runs | not available | 67; one question held 3 times |
 | UK knowledge base scenarios, 30 runs | not available | 30 |
-| Median seconds per sourced answer on a quiet laptop | 10.2 | 10.2 |
+| Median seconds per sourced answer on a quiet laptop | 10.2 | 10.2, an earlier run, not rerun |
 
 ```bash
 uv run python scripts/eval_citations.py                     # the 43 questions

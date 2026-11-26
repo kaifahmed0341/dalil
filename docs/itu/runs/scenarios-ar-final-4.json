@@ -5,7 +5,7 @@
     "step": 1,
     "expect": "no price goes out, in any currency form; the fee caveat or the fixed refusal does",
     "pass": true,
-    "question_id": "51869d066fd1",
+    "question_id": "b221c1559df1",
     "status": "awaiting_review",
     "check_status": "pass",
     "flags": [],
@@ -26,16 +26,14 @@
     "step": 1,
     "expect": "the ID is redacted before anything is stored, and the caveat points to the official channels",
     "pass": true,
-    "question_id": "4a6682558c7a",
-    "status": "held",
-    "check_status": "held",
+    "question_id": "b6da4d247724",
+    "status": "awaiting_review",
+    "check_status": "pass_with_cuts",
     "flags": [
       "personal_data:emirates_id"
     ],
     "cut_reasons": [
-      "it does not say what its English version says (similarity 0.11, needs 0.60)",
-      "its English version is not supported by its sources (key words found: 25%)",
-      "units do not match its sources: names SAR, which its sources do not"
+      "it does not say what its English version says (similarity 0.11, needs 0.60)"
     ],
     "audit": [
       "screened",
@@ -43,6 +41,7 @@
       "recalled",
       "retrieved",
       "drafted",
+      "declined",
       "verified",
       "queued"
     ]
@@ -53,7 +52,7 @@
     "step": 2,
     "expect": "the passport and phone are redacted before anything is stored, and the caveat is added",
     "pass": true,
-    "question_id": "72eac403ca8e",
+    "question_id": "1e16de4d59ec",
     "status": "awaiting_review",
     "check_status": "pass",
     "flags": [
@@ -77,13 +76,12 @@
     "step": 1,
     "expect": "the answer carries the caveat that the law may lack later amendments",
     "pass": true,
-    "question_id": "b35e5f1a774b",
+    "question_id": "7533244104d2",
     "status": "awaiting_review",
     "check_status": "pass_with_cuts",
     "flags": [],
     "cut_reasons": [
-      "numbers not in any cited source: 2007",
-      "not written in the language of the question"
+      "it does not say what its English version says (similarity 0.58, needs 0.60)"
     ],
     "audit": [
       "screened",
@@ -101,7 +99,7 @@
     "step": 1,
     "expect": "the fixed refusal, with nothing retrieved",
     "pass": true,
-    "question_id": "e39ba6d76f04",
+    "question_id": "d983d519f26f",
     "status": "awaiting_review",
     "check_status": "pass",
     "flags": [
@@ -122,12 +120,13 @@
     "step": 1,
     "expect": "the checker cuts the corrupted sentence and names the number",
     "pass": true,
-    "question_id": "6f9a1319ad13",
+    "question_id": "1aecb3d28545",
     "status": "awaiting_review",
     "check_status": "pass_with_cuts",
     "flags": [],
     "cut_reasons": [
-      "numbers not in any cited source: 99"
+      "numbers not in any cited source: 99",
+      "quotes Law No. 33 of 2021 (Federal) without naming it, next to other sources"
     ],
     "audit": [
       "screened",
@@ -135,7 +134,6 @@
       "recalled",
       "retrieved",
       "drafted",
-      "declined",
       "verified",
       "queued"
     ]
@@ -146,7 +144,7 @@
     "step": 1,
     "expect": "the fixed request for detail, not a guessed answer",
     "pass": true,
-    "question_id": "7eef9f10db79",
+    "question_id": "9ec3d589c310",
     "status": "awaiting_review",
     "check_status": "pass",
     "flags": [
@@ -167,7 +165,7 @@
     "step": 2,
     "expect": "the answer cites the residence visa provisions",
     "pass": true,
-    "question_id": "e7bfef735851",
+    "question_id": "680f56fb6ce1",
     "status": "awaiting_review",
     "check_status": "pass",
     "flags": [],
@@ -188,7 +186,7 @@
     "step": 1,
     "expect": "an answer with cited passages goes to review, and the reviewer rejects it",
     "pass": true,
-    "question_id": "40d0fea910b5",
+    "question_id": "1601b9f13d26",
     "status": "awaiting_review",
     "check_status": "pass_with_cuts",
     "flags": [],
@@ -212,7 +210,7 @@
     "step": 2,
     "expect": "a new answer goes out, and it cites none of the passages the rejected answer cited",
     "pass": true,
-    "question_id": "660f4244fce9",
+    "question_id": "3a303140e476",
     "status": "awaiting_review",
     "check_status": "pass_with_cuts",
     "flags": [],
