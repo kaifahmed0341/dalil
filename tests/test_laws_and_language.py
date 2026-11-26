@@ -984,3 +984,7 @@ def test_a_law_number_in_the_english_version_is_not_a_dropped_number():
                               "text_en": "Under Law No. 33 of 2021, the notice period must not be less than 30 days.",
                               "citations": [{"passage_id": p["passage_id"], "quote": p["text"]}]})
     assert check.kept, check.reasons
+    dropped = v.check_sentence({"text": "بموجب قانون العمل، يجب ألا تقل مدة الإشعار عن المدة المحددة.",
+                                "text_en": "Under Law No. 33 of 2021, the notice period must not be less than 30 days.",
+                                "citations": [{"passage_id": p["passage_id"], "quote": p["text"]}]})
+    assert not dropped.kept and "English version has: 30" in " ".join(dropped.reasons)

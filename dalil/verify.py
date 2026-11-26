@@ -685,9 +685,12 @@ class Verifier:
         # two are left out: Arabic often says them in the noun itself, "سنة"
         # (a year), "الطرفين" (both parties). The claim's own numbers were
         # checked against the sources above.
-        # A law's number and year in the English version name the law; the
-        # claim may name it another way, so they are not counted as dropped.
-        dropped = sorted(numbers(en) - numbers(text) - {"1", "2"} - law_numbers(en), key=lambda n: (len(n), n))
+        # A cited law's number and year in the English version name the law;
+        # the claim may name it another way, so they are not counted as
+        # dropped. A number the English says outside a law's name still is.
+        said = numbers(_LAW_NUMBER.sub(" ", unicodedata.normalize("NFKC", en).translate(_ARABIC_DIGITS))) \
+            | (law_numbers(en) - titled)
+        dropped = sorted(said - numbers(text) - {"1", "2"}, key=lambda n: (len(n), n))
         if dropped:
             problems.append("it leaves out numbers its English version has: " + ", ".join(dropped))
         ar_neg = {w for w in _negations(_words(_without_idioms(text)))
