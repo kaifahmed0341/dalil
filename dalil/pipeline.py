@@ -494,7 +494,9 @@ class Pipeline:
             # instead: the extractive drafter copies whole source sentences,
             # so whatever it keeps is the documents' own words.
             # Quote from the page the question is about, when it names one.
-            redraft = ExtractiveDrafter().draft(q, [h for h in hits if h.doc_id in subjects] or hits, data)
+            # Two passages can hold the same sentence; it is quoted once.
+            redraft = drop_repeats(ExtractiveDrafter().draft(q, [h for h in hits if h.doc_id in subjects] or hits,
+                                                             data), data)
             if screened.has_personal_data:
                 redraft = [*redraft, caveat(self.screener.personal_data_caveat)]
             redraft = [{**s, "text": lang.fixed(s["text"], question_lang)}
@@ -567,7 +569,8 @@ def drop_repeats(draft: list[dict[str, Any]], data: list[DataResult] = ()) -> li
     out = []
     for s in draft:
         if s.get("kind", "claim") == "claim":
-            key = " ".join(str(s.get("text", "")).split()).casefold()
+            # Case, spacing and punctuation do not make a sentence a new one.
+            key = " ".join(re.sub(r"[^\w]+", " ", str(s.get("text", ""))).split()).casefold()
             nums = _numbers(str(s.get("text", "")))
             if key in seen or (nums & values and nums <= said):
                 continue

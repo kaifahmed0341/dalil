@@ -599,10 +599,15 @@ class Verifier:
             # A cited document's title counts too: the writer is told to name
             # the law it quotes, and naming it adds no claim.
             evidence = " ".join(f"{c.title} {c.context} {c.evidence}" for c in result.citations)
-            if _script(text) != _script(" ".join(quotes)) and result.text_en \
-                    and _script(result.text_en) == _script(" ".join(quotes)):
+            # A claim citing at least one passage in its own language is matched
+            # word for word, as any same-language claim is: an Arabic quote of
+            # an Arabic article stays checkable even when it also cites the
+            # English version of that article.
+            cross = _script(text) != _script(" ".join(quotes)) \
+                and not any(_script(q) == _script(text) for q in quotes)
+            if cross and result.text_en and _script(result.text_en) == _script(" ".join(quotes)):
                 self.check_rendering(result, evidence, quotes)
-            elif _script(text) != _script(" ".join(quotes)):
+            elif cross:
                 # Words cannot be matched across languages; compare meaning,
                 # against each clause of the quotes, since a claim usually
                 # renders one clause of a long legal sentence.
@@ -680,7 +685,9 @@ class Verifier:
         # two are left out: Arabic often says them in the noun itself, "سنة"
         # (a year), "الطرفين" (both parties). The claim's own numbers were
         # checked against the sources above.
-        dropped = sorted(numbers(en) - numbers(text) - {"1", "2"}, key=lambda n: (len(n), n))
+        # A law's number and year in the English version name the law; the
+        # claim may name it another way, so they are not counted as dropped.
+        dropped = sorted(numbers(en) - numbers(text) - {"1", "2"} - law_numbers(en), key=lambda n: (len(n), n))
         if dropped:
             problems.append("it leaves out numbers its English version has: " + ", ".join(dropped))
         ar_neg = {w for w in _negations(_words(_without_idioms(text)))

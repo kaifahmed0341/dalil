@@ -958,3 +958,29 @@ def test_a_leading_law_name_sentence_is_set_aside_for_the_meaning_test():
     assert _ATTRIBUTION.sub("", t) == "يجب تحديد الإيجار في عقد الإيجار."
     assert _ATTRIBUTION.sub("", "Law No. 26 of 2007 regulates rent. The Rent must be specified.") == "The Rent must be specified."
     assert _ATTRIBUTION.sub("", "The Rent must be specified in the contract.") == "The Rent must be specified in the contract."
+
+
+def test_an_arabic_quote_citing_both_language_versions_is_matched_word_for_word():
+    ar_text = "لا تسري أحكام هذا المرسوم بقانون على الجهات الحكومية المتحكمة بالبيانات الشخصية."
+    ar = passage("sample-pdpl-ar:p2:1", ar_text, kind="pdf")
+    en = passage("sample-pdpl:p2:1", "The provisions of this Decree-Law shall not apply to Government entities "
+                 "controlling or processing Personal Data.", kind="pdf")
+    # A low meaning score against a short English summary must not cut a verbatim quote.
+    v = Verifier({ar["passage_id"]: ar, en["passage_id"]: en}, similarity=lambda c, w: [0.5 for _ in w])
+    claim = {"text": ar_text, "text_en": "Under Federal Decree-Law No. 45 of 2021, the law does not apply to "
+             "government entities.",
+             "citations": [{"passage_id": ar["passage_id"], "quote": ar_text},
+                           {"passage_id": en["passage_id"], "quote": en["text"]}]}
+    assert v.check_sentence(claim).kept
+    changed = {**claim, "text": "يحق للشركات الخاصة والمستشفيات بيع السجلات الطبية للمرضى."}
+    assert not v.check_sentence(changed).kept  # still compared with its Arabic source
+
+
+def test_a_law_number_in_the_english_version_is_not_a_dropped_number():
+    p = passage("sample-notice:p5:1", "The notice period must not be less than 30 days.", kind="pdf")
+    v = Verifier({p["passage_id"]: p}, titles={"sample-notice": "Federal Decree-Law No. 33 of 2021"},
+                 similarity=lambda c, w: [0.9 for _ in w])
+    check = v.check_sentence({"text": "بموجب قانون العمل، يجب ألا تقل مدة الإشعار عن 30 يوماً.",
+                              "text_en": "Under Law No. 33 of 2021, the notice period must not be less than 30 days.",
+                              "citations": [{"passage_id": p["passage_id"], "quote": p["text"]}]})
+    assert check.kept, check.reasons

@@ -255,3 +255,13 @@ def test_search_fills_up_from_below_when_passages_are_left_out():
     p.retriever, p.k = Ranked(), 3
     got = [h.passage_id for h in p.search("q", {"p0", "p1"})]
     assert got == ["p2", "p3", "p4"]
+
+
+def test_a_sentence_is_said_once_whatever_its_punctuation_or_citation():
+    from dalil.pipeline import drop_repeats
+    a = {"text": "Golden visa holders can sponsor their spouse and children.", "kind": "claim",
+         "citations": [{"passage_id": "gold:p1:1"}]}
+    b = {"text": "golden visa holders can sponsor their spouse and children", "kind": "claim",
+         "citations": [{"passage_id": "gold:p2:1"}]}
+    c = {"text": "Golden visa holders can sponsor domestic workers.", "kind": "claim", "citations": []}
+    assert drop_repeats([a, b, c]) == [a, c]
